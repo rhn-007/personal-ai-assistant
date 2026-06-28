@@ -5,12 +5,16 @@ Main Assistant Class - Coordinates all components (Updated with Email)
 import os
 from typing import Optional, List
 from dotenv import load_dotenv
+import sys
 
-from .conversation import ConversationManager
-from .memory import MemoryManager
-from ..integrations.openai import OpenAIIntegration
-from ..integrations.email import EmailIntegration
-from ..utils.logger import setup_logger
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from core.conversation import ConversationManager
+from core.memory import MemoryManager
+from integrations.openai import OpenAIIntegration
+from integrations.email import EmailIntegration
+from utils.logger import setup_logger
 
 load_dotenv()
 
