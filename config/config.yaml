@@ -1,0 +1,64 @@
+# Personal AI Assistant Configuration
+
+# Assistant Settings
+assistant:
+  name: "PersonalAI"
+  version: "1.0.0"
+  description: "Your personal AI assistant for task automation and conversation"
+  
+# OpenAI Settings
+openai:
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 2000
+  
+# Conversation Settings
+conversation:
+  history_limit: 100
+  context_window: 10
+  enable_history_search: true
+  
+# Integrations
+integrations:
+  openai:
+    enabled: true
+  
+  email:
+    enabled: true
+    service: "gmail"
+    check_interval: 300  # seconds
+    
+  slack:
+    enabled: false
+    sync_interval: 300  # seconds
+  
+  calendar:
+    enabled: false
+  
+  weather:
+    enabled: false
+  
+  twitter:
+    enabled: false
+
+# Task Automation
+tasks:
+  enabled: true
+  scheduler: "apscheduler"
+  
+  scheduled_tasks:
+    - name: "Daily Briefing"
+      trigger: "cron"
+      hour: 8
+      minute: 0
+      
+    - name: "Email Digest"
+      trigger: "cron"
+      hour: 18
+      minute: 0
+  
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/assistant.log"
