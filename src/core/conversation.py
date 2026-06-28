@@ -4,8 +4,12 @@ Conversation Management - Handles conversation flow and context
 
 from typing import List, Dict, Optional
 from datetime import datetime
-from .memory import MemoryManager
-from ..utils.logger import setup_logger
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from core.memory import MemoryManager
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
