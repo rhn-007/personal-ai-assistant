@@ -6,7 +6,7 @@ import os
 import mimetypes
 from pathlib import Path
 from typing import Optional, List
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
