@@ -12,7 +12,7 @@ from google.auth.oauthlib.flow import InstalledAppFlow
 from google_auth_httplib2 import AuthorizedHttp
 import googleapiclient.discovery
 from email.mime.text import MIMEText
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
