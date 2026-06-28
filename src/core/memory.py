@@ -7,7 +7,12 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
-from ..utils.logger import setup_logger
+
+# Import logger from utils
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
