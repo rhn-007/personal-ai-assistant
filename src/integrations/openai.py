@@ -5,7 +5,7 @@ OpenAI Integration - Wrapper for OpenAI API
 import os
 from typing import List, Dict, Optional
 from openai import OpenAI
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
