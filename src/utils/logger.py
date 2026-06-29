@@ -1,51 +1,60 @@
-"""
-Logging Configuration
-"""
+#!/usr/bin/env python3
 
-import logging
+import sys
 import os
-from pathlib import Path
+from dotenv import load_dotenv
+import typer
 
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-LOG_DIR = Path('logs')
-LOG_DIR.mkdir(exist_ok=True)
+# FIX PATH ISSUE
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from src.core.assistant import PersonalAssistant
+from src.utils.logger import setup_logger
+
+load_dotenv()
+
+logger = setup_logger(__name__)
+
+app = typer.Typer()
+assistant = None
 
 
-def setup_logger(name: str) -> logging.Logger:
-    """
-    Setup logger for a module
-    
-    Args:
-        name: Logger name (usually __name__)
-        
-    Returns:
-        Configured logger instance
-    """
-    logger = logging.getLogger(name)
-    
-    if logger.hasHandlers():
-        return logger
-    
-    logger.setLevel(LOG_LEVEL)
-    
-    # File handler
-    file_handler = logging.FileHandler(LOG_DIR / 'assistant.log')
-    file_handler.setLevel(LOG_LEVEL)
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    
-    # Formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-    
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    return logger
+def init_assistant():
+    global assistant
+    if assistant is None:
+        logger.info("Initializing Personal AI Assistant...")
+        assistant = PersonalAssistant()
+    return assistant
+
+
+@app.command()
+def chat():
+    init_assistant()
+    print("AI Assistant Ready")
+
+    while True:
+        q = input("You: ")
+
+        if q.lower() == "quit":
+            break
+
+        print("Assistant:", assistant.process_input(q))
+
+
+@app.command()
+def ask(question: str):
+    init_assistant()
+    print(assistant.process_input(question))
+
+
+@app.command()
+def version():
+    print("Personal AI Assistant v1.0.0")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        init_assistant()
+        chat()
+    else:
+        app()
