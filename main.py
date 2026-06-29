@@ -13,7 +13,7 @@ from typing import Optional
 load_dotenv()
 
 
-from core.assistant import PersonalAssistant
+from src.core.assistant import PersonalAssistant
 from utils.logger import setup_logger
 
 # Setup logging
