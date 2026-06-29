@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # FIXED IMPORTS (IMPORTANT)
 from src.core.conversation import ConversationManager
 from src.core.memory import MemoryManager
-from src.integrations.openai import OpenAIIntegration
+from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
 
@@ -29,7 +29,7 @@ class PersonalAssistant:
         # Core components
         self.memory_manager = MemoryManager()
         self.conversation_manager = ConversationManager(self.memory_manager)
-        self.openai = OpenAIIntegration()
+        self.llm = OllamaIntegration()
 
         # Email integration (optional)
         try:
@@ -49,7 +49,7 @@ class PersonalAssistant:
 
             # Normal AI response
             context = self.conversation_manager.get_context()
-            response = self.openai.generate_response(user_input, context)
+            response = self.llm.generate_response(user_input, context)
 
             self.conversation_manager.add_exchange(user_input, response)
             return response
