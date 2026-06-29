@@ -1,9 +1,8 @@
 """
-Main Assistant Class
+Main Assistant Class - Memory 2.0 Upgrade (Persistent User Memory + Context Injection)
 """
 
 import os
-import re
 from dotenv import load_dotenv
 
 from src.core.conversation import ConversationManager
@@ -18,154 +17,127 @@ logger = setup_logger(__name__)
 
 
 class PersonalAssistant:
-    """Main Personal AI Assistant"""
+    """AI Assistant with persistent memory + context awareness"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant...")
+        self.logger.info("Initializing PersonalAssistant (Memory 2.0)...")
 
-        # Core
-        self.memory_manager = MemoryManager()
-        self.conversation_manager = ConversationManager(self.memory_manager)
+        # Core systems
+        self.memory = MemoryManager()
+        self.conversation = ConversationManager(self.memory)
+
+        # LLM (Ollama)
         self.llm = OllamaIntegration()
-
-        # Load long-term memory
-        self.profile = self.memory_manager.get_all_profile()
 
         # Email (optional)
         try:
             self.email = EmailIntegration()
         except Exception as e:
-            self.logger.warning(f"Email integration disabled: {e}")
+            self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        self.logger.info("PersonalAssistant initialized successfully")
+        # Load persistent memory into context
+        self._load_user_memory()
 
-    # ----------------------------------------------------
+        self.logger.info("Assistant ready with Memory 2.0")
+
+    # ---------------- MEMORY LOADING ----------------
+
+    def _load_user_memory(self):
+        """Load persistent memory into system context"""
+        profile = self.memory.get_all_profile()
+
+        if profile:
+            memory_text = "User Profile Memory:\n"
+            for k, v in profile.items():
+                memory_text += f"- {k}: {v}\n"
+
+            self.conversation.add_system_context(memory_text)
+
+    # ---------------- MAIN PIPELINE ----------------
 
     def process_input(self, user_input: str) -> str:
-        """Main processing pipeline"""
+        """Main entry point"""
 
         try:
+            # 1. Check if user is storing memory explicitly
+            self._auto_memory_capture(user_input)
 
-            text = user_input.strip()
+            # 2. Email routing
+            if self.email and self._is_email_query(user_input):
+                return self._handle_email_query(user_input)
 
-            # ---------------- EMAIL ----------------
+            # 3. Build context
+            context = self.conversation.get_context()
 
-            if self.email and self._is_email_query(text):
-                return self._handle_email_query(text)
+            # 4. Add memory snapshot dynamically (VERY IMPORTANT)
+            profile = self.memory.get_all_profile()
+            if profile:
+                context.insert(0, {
+                    "role": "system",
+                    "content": f"User memory: {profile}"
+                })
 
-            lower = text.lower()
+            # 5. Generate response
+            response = self.llm.generate_response(user_input, context)
 
-            # ---------------- REMEMBER NAME ----------------
-
-            patterns = [
-                r"my name is (.+)",
-                r"i am (.+)",
-                r"i'm (.+)"
-            ]
-
-            for pattern in patterns:
-                match = re.match(pattern, lower)
-
-                if match:
-                    name = match.group(1).strip().title()
-
-                    self.memory_manager.set_profile("name", name)
-                    self.profile["name"] = name
-
-                    return f"Nice to meet you, {name}! I'll remember your name."
-
-            # ---------------- RECALL NAME ----------------
-
-            if (
-                "what is my name" in lower
-                or "who am i" in lower
-            ):
-                name = self.memory_manager.get_profile("name")
-
-                if name:
-                    return f"Your name is {name}."
-
-                return "I don't know your name yet."
-
-            # ---------------- BUILD CONTEXT ----------------
-
-            context = self.conversation_manager.get_context()
-
-            if self.profile:
-
-                memory_text = "\n".join(
-                    f"{k}: {v}"
-                    for k, v in self.profile.items()
-                )
-
-                context.insert(
-                    0,
-                    {
-                        "role": "system",
-                        "content":
-                            "Known facts about the user:\n"
-                            + memory_text
-                    }
-                )
-
-            # ---------------- LLM ----------------
-
-            response = self.llm.generate_response(
-                text,
-                context
-            )
-
-            self.conversation_manager.add_exchange(
-                text,
-                response
-            )
+            # 6. Save conversation
+            self.conversation.add_exchange(user_input, response)
 
             return response
 
         except Exception as e:
-            self.logger.error(f"Error processing input: {e}")
-            return f"Error: {e}"
+            self.logger.error(f"Processing error: {e}")
+            return f"Error: {str(e)}"
 
-    # ----------------------------------------------------
+    # ---------------- MEMORY AUTO LEARNING ----------------
 
-    def _is_email_query(self, text: str):
-        keywords = [
-            "email",
-            "mail",
-            "gmail",
-            "inbox",
-            "unread",
-            "send",
-            "from:"
-        ]
+    def _auto_memory_capture(self, text: str):
+        """
+        Extract simple memory patterns automatically
+        (v2.0 lightweight memory learning)
+        """
 
+        text_lower = text.lower()
+
+        # NAME MEMORY
+        if "my name is" in text_lower:
+            name = text.split("is")[-1].strip()
+            self.memory.set_profile("name", name)
+
+        # PREFERENCE MEMORY
+        if "i like" in text_lower:
+            pref = text.split("like")[-1].strip()
+            self.memory.set_profile("likes", pref)
+
+        if "i hate" in text_lower:
+            dislike = text.split("hate")[-1].strip()
+            self.memory.set_profile("dislikes", dislike)
+
+    # ---------------- EMAIL ----------------
+
+    def _is_email_query(self, text: str) -> bool:
+        keywords = ["email", "mail", "gmail", "inbox", "unread", "send", "from:"]
         return any(k in text.lower() for k in keywords)
 
-    def _handle_email_query(self, user_input: str):
-
+    def _handle_email_query(self, user_input: str) -> str:
         try:
-
             text = user_input.lower()
 
             if "unread" in text or "check" in text:
                 return self.email.get_email_summary()
 
             if "from:" in text:
-
                 sender = text.split("from:")[1].split()[0]
-
                 emails = self.email.get_emails_from(sender)
 
                 if not emails:
                     return f"No emails found from {sender}"
 
                 return "\n".join(
-                    [
-                        f"- {e.get('subject','No Subject')} ({e.get('date','')})"
-                        for e in emails
-                    ]
+                    f"- {e.get('subject','No Subject')} ({e.get('date','')})"
+                    for e in emails
                 )
 
             return self.email.get_email_summary()
@@ -173,125 +145,70 @@ class PersonalAssistant:
         except Exception as e:
             return f"Email error: {e}"
 
-    # ----------------------------------------------------
-    # EMAIL
-    # ----------------------------------------------------
+    # ---------------- EMAIL API ----------------
 
-    def send_email(self, to, subject, body):
-        if not self.email:
-            return False
-        return self.email.send_email(to, subject, body)
+    def send_email(self, to: str, subject: str, body: str) -> bool:
+        return self.email.send_email(to, subject, body) if self.email else False
 
-    def get_email_summary(self):
-        if not self.email:
-            return "Email not available"
-        return self.email.get_email_summary()
+    # ---------------- HISTORY ----------------
 
-    # ----------------------------------------------------
-    # HISTORY
-    # ----------------------------------------------------
-
-    def show_history(self, limit=10):
-
-        history = self.conversation_manager.get_history(limit)
+    def show_history(self, limit: int = 10):
+        history = self.conversation.get_history(limit)
 
         if not history:
             print("No history found.")
             return
 
-        print("\nConversation History")
+        print("\n🧠 Conversation History")
         print("=" * 40)
 
         for i, h in enumerate(history, 1):
             print(f"\n[{i}] {h['timestamp']}")
-            print(f"You: {h['user']}")
-            print(f"Assistant: {h['assistant']}")
+            print(f"You: {h['user'][:80]}")
+            print(f"AI: {h['assistant'][:80]}")
 
     def clear_history(self):
-        self.conversation_manager.clear_history()
+        self.conversation.clear_history()
         self.logger.info("History cleared")
 
-    # ----------------------------------------------------
-    # TASKS
-    # ----------------------------------------------------
+    # ---------------- MEMORY CONTROL ----------------
 
-    def show_tasks(self):
-        print("""
-Tasks:
-- daily_briefing
-- weekly_report
-- social_media
-- email_digest
-- check_emails
-""")
+    def remember(self, key: str, value: str):
+        """Manual memory storage"""
+        self.memory.set_profile(key, value)
 
-    def execute_task(self, task_name):
+    def recall(self, key: str):
+        """Manual memory retrieval"""
+        return self.memory.get_profile(key)
+
+    def show_memory(self):
+        """Show everything assistant remembers"""
+        return self.memory.get_all_profile()
+
+    # ---------------- TASKS ----------------
+
+    def execute_task(self, task_name: str):
 
         tasks = {
-            "daily_briefing": self._daily_briefing,
-            "weekly_report": self._weekly_report,
-            "social_media": self._social_media_post,
-            "email_digest": self._email_digest,
-            "check_emails": self._check_emails,
+            "daily_briefing": lambda: self.process_input("Give me a daily briefing"),
+            "weekly_report": lambda: self.process_input("Generate weekly report"),
+            "social_media": lambda: self.process_input("Write a tweet about AI"),
         }
 
-        task = tasks.get(task_name.lower())
-
-        if task:
-            task()
+        if task_name in tasks:
+            return tasks[task_name]()
         else:
-            raise ValueError(f"Unknown task: {task_name}")
+            raise ValueError("Unknown task")
 
-    # ----------------------------------------------------
-    # CONFIG
-    # ----------------------------------------------------
+    # ---------------- CONFIG ----------------
 
     def show_config(self):
-
-        print("\nConfiguration")
+        print("\n⚙️ System Status")
         print("=" * 30)
 
-        print("Using Ollama: True")
+        print("OpenAI:", bool(os.getenv("OPENAI_API_KEY")))
+        print("Ollama:", True)
         print("Email:", bool(self.email))
-        print("Saved Profile:", self.profile)
 
-    # ----------------------------------------------------
-    # TASK IMPLEMENTATIONS
-    # ----------------------------------------------------
-
-    def _daily_briefing(self):
-        print(self.process_input(
-            "Give me today's briefing."
-        ))
-
-    def _weekly_report(self):
-        print(self.process_input(
-            "Generate my weekly report."
-        ))
-
-    def _social_media_post(self):
-        print(self.process_input(
-            "Write an AI social media post."
-        ))
-
-    def _email_digest(self):
-
-        if not self.email:
-            print("Email unavailable.")
-            return
-
-        emails = self.email.get_email_summary()
-
-        print(
-            self.process_input(
-                f"Summarize these emails:\n{emails}"
-            )
-        )
-
-    def _check_emails(self):
-
-        if not self.email:
-            print("Email unavailable.")
-            return
-
-        print(self.email.get_email_summary())
+        print("\n🧠 Memory:")
+        print(self.memory.get_all_profile())
