@@ -9,7 +9,7 @@ import typer
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
-from src.core.assistant import PersonalAssistant
+
 from src.utils.logger import setup_logger
 
 load_dotenv()
