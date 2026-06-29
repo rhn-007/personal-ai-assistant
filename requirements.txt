@@ -1,12 +1,26 @@
-openai==1.3.0
+# Core
+openai>=1.40.0
 python-dotenv==1.0.0
-requests==2.31.0
 typer==0.9.0
 rich==13.5.0
+
+# Utilities
+requests==2.31.0
 python-dateutil==2.8.2
 click==8.1.7
 colorama==0.4.6
 tabulate==0.9.0
+
+# Google / Gmail API (FIX EMAIL SYSTEM)
+google-auth==2.55.1
+google-auth-oauthlib==1.4.0
+google-auth-httplib2==0.4.0
+google-api-python-client==2.198.0
+
+# Scheduler (for your YAML config)
+apscheduler==3.10.4
+
+# Security / HTTPS
 urllib3==2.0.7
 certifi==2023.7.22
 charset-normalizer==3.3.2
