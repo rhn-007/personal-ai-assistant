@@ -1,13 +1,17 @@
-# Environment variables
+# =========================
+# ENV FILES
+# =========================
 .env
 .env.local
 .env.*.local
 
-# Python
+# =========================
+# PYTHON
+# =========================
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
 .Python
 build/
 develop-eggs/
@@ -28,39 +32,54 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# =========================
+# VIRTUAL ENVIRONMENTS
+# =========================
 venv/
 ENV/
 env/
-.venv
+.venv/
 
-# IDE
+# =========================
+# IDE / EDITORS
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
 
-# Logs
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# LOGS
+# =========================
 logs/
 *.log
 
-# Database
+# =========================
+# DATABASES
+# =========================
 *.db
 data/history.db
 
-# Testing
+# =========================
+# TESTING
+# =========================
 .pytest_cache/
 .coverage
 htmlcov/
 
-# OS
-Thumbs.db
-.DS_Store
-
-# Project specific
+# =========================
+# PROJECT SPECIFIC
+# =========================
 config/local.yaml
+
+# IMPORTANT FIX:
 data/
 credentials.json
 token.pickle
