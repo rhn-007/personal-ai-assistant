@@ -23,6 +23,47 @@ class MemoryManager:
         self.db_path = db_path
         self._ensure_db_exists()
 
+    def set_memory(self, key: str, value: str):
+        """Store a memory fact"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO user_memory (key, value, timestamp)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET
+                        value=excluded.value,
+                        timestamp=excluded.timestamp
+                ''', (key, value, datetime.now().isoformat()))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Memory save error: {e}")
+    
+    
+    def get_memory(self, key: str):
+        """Retrieve a memory fact"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT value FROM user_memory WHERE key=?', (key,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.error(f"Memory fetch error: {e}")
+            return None
+    
+    
+    def get_all_memory(self):
+        """Get full profile memory"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT key, value FROM user_memory')
+                return dict(cursor.fetchall())
+        except Exception as e:
+            logger.error(f"Memory fetch error: {e}")
+            return {}
+
     # ---------------- DB INIT ----------------
 
     def _ensure_db_exists(self) -> None:
@@ -57,6 +98,15 @@ class MemoryManager:
                 CREATE TABLE IF NOT EXISTS user_profile (
                     key TEXT PRIMARY KEY,
                     value TEXT
+                )
+            ''')
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_memory (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT UNIQUE,
+                    value TEXT,
+                    timestamp TEXT
                 )
             ''')
 
