@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Personal AI Assistant - Main Entry Point (Improved Stable Version)
+Personal AI Assistant - Main Entry Point (Stable + Ollama Ready)
 """
 
 import sys
@@ -9,6 +9,7 @@ import typer
 
 load_dotenv()
 
+# FIX: keep imports clean and safe
 from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
 
@@ -17,6 +18,8 @@ logger = setup_logger(__name__)
 app = typer.Typer()
 assistant = None
 
+
+# ---------------- INIT ----------------
 
 def init_assistant():
     """Initialize assistant once"""
@@ -34,10 +37,13 @@ def init_assistant():
     return assistant
 
 
+# ---------------- CHAT MODE ----------------
+
 @app.command()
 def chat():
     """Interactive chat mode"""
-    init_assistant()
+    bot = init_assistant()
+
     print("\n🤖 AI Assistant Ready (type 'help' for commands)\n")
 
     while True:
@@ -47,15 +53,17 @@ def chat():
             if not user_input:
                 continue
 
-            if user_input.lower() in ["quit", "exit"]:
+            cmd = user_input.lower()
+
+            if cmd in ["quit", "exit"]:
                 print("Bye 👋")
                 break
 
-            if user_input.lower() == "help":
+            if cmd == "help":
                 print_help()
                 continue
 
-            response = assistant.process_input(user_input)
+            response = bot.process_input(user_input)
             print(f"\nAssistant: {response}\n")
 
         except KeyboardInterrupt:
@@ -67,33 +75,41 @@ def chat():
             print(f"❌ Error: {e}")
 
 
+# ---------------- ASK MODE ----------------
+
 @app.command()
 def ask(question: str):
     """Single question mode"""
-    init_assistant()
+    bot = init_assistant()
 
     try:
-        print(assistant.process_input(question))
+        response = bot.process_input(question)
+        print(response)
     except Exception as e:
         logger.error(f"Ask error: {e}")
         print(f"❌ Error: {e}")
 
 
+# ---------------- VERSION ----------------
+
 @app.command()
 def version():
-    """Show version"""
-    print("AI Assistant v1.0.0")
+    print("AI Assistant v1.0.0 (Ollama Ready)")
 
+
+# ---------------- HELP ----------------
 
 def print_help():
     print("""
 📌 Commands:
-- chat     → interactive mode
-- ask "q"  → single question
-- version  → show version
-- exit     → quit chat
+- chat        → interactive mode
+- ask "text"  → single question
+- version     → show version
+- exit        → quit chat
 """)
 
+
+# ---------------- ENTRY POINT ----------------
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
