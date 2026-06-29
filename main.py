@@ -12,8 +12,6 @@ from typing import Optional
 # Load environment variables
 load_dotenv()
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from core.assistant import PersonalAssistant
 from utils.logger import setup_logger
