@@ -54,6 +54,15 @@ class OpenAIIntegration:
 
         except Exception as e:
             logger.error(f"OpenAI error: {e}")
+        
+            error_msg = str(e).lower()
+        
+            if "insufficient_quota" in error_msg:
+                return "⚠️ OpenAI quota finished. Please check your billing at https://platform.openai.com/account/billing"
+        
+            if "invalid_api_key" in error_msg:
+                return "⚠️ Invalid API key. Please check your OPENAI_API_KEY in .env"
+        
             return f"AI error: {str(e)}"
 
     def summarize_text(self, text: str) -> str:
