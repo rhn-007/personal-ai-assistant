@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
 from google.oauth2 import service_account
-from google.auth.oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow
 from google_auth_httplib2 import AuthorizedHttp
 import googleapiclient.discovery
 from email.mime.text import MIMEText
