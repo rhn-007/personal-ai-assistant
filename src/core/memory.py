@@ -1,283 +1,247 @@
 """
-Main Assistant Class - Memory 3.0 Upgrade (Personality + Event-Based Memory)
+Memory Management - Memory 4.0 (Semantic + Smart Recall + Weighted Memory)
 """
 
+import sqlite3
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional
+
+import sys
 import os
-from dotenv import load_dotenv
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.core.conversation import ConversationManager
-from src.core.memory import MemoryManager
-from src.integrations.ollama import OllamaIntegration
-from src.integrations.email import EmailIntegration
-from src.utils.logger import setup_logger
+from utils.logger import setup_logger
 
-load_dotenv()
+logger = setup_logger(__name__)
 
 
-class PersonalAssistant:
-    """AI Assistant with Persistent Memory + Personality + Event Learning"""
+class MemoryManager:
+    """Advanced persistent memory system (Memory 4.0)"""
 
-    def __init__(self):
-        self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 3.0)...")
+    def __init__(self, db_path: str = "data/history.db"):
+        self.db_path = db_path
+        self._ensure_db_exists()
 
-        # Core systems
-        self.memory = MemoryManager()
-        self.conversation = ConversationManager(self.memory)
+    # ---------------- INIT ----------------
 
-        # LLM
-        self.llm = OllamaIntegration()
+    def _ensure_db_exists(self):
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Email (optional)
-        try:
-            self.email = EmailIntegration()
-        except Exception as e:
-            self.logger.warning(f"Email disabled: {e}")
-            self.email = None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
 
-        # Personality state
-        self.personality_cache = {
-            "tone": None,
-            "communication_style": None,
-            "interests": [],
+            # Conversations
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    user_message TEXT,
+                    assistant_message TEXT,
+                    metadata TEXT
+                )
+            """)
+
+            # Profile memory (key-value)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_profile (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TEXT
+                )
+            """)
+
+            # 🔥 NEW: semantic memory table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS semantic_memory (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category TEXT,
+                    value TEXT,
+                    weight INTEGER DEFAULT 1,
+                    last_used TEXT
+                )
+            """)
+
+            conn.commit()
+            logger.info("Memory 4.0 DB initialized")
+
+    # ---------------- BASIC PROFILE MEMORY ----------------
+
+    def set_profile(self, key: str, value: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_profile (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value,
+                    updated_at=excluded.updated_at
+            """, (key, value, datetime.now().isoformat()))
+            conn.commit()
+
+    def get_profile(self, key: str) -> Optional[str]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM user_profile WHERE key=?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def get_all_profile(self) -> Dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM user_profile")
+            return dict(cursor.fetchall())
+
+    # ---------------- 🔥 SEMANTIC MEMORY ----------------
+
+    def add_semantic_memory(self, category: str, value: str):
+        """Store categorized memory with weighting"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # check if exists
+            cursor.execute("""
+                SELECT weight FROM semantic_memory
+                WHERE category=? AND value=?
+            """, (category, value))
+
+            row = cursor.fetchone()
+
+            if row:
+                # increase strength
+                cursor.execute("""
+                    UPDATE semantic_memory
+                    SET weight = weight + 1,
+                        last_used = ?
+                    WHERE category=? AND value=?
+                """, (datetime.now().isoformat(), category, value))
+            else:
+                cursor.execute("""
+                    INSERT INTO semantic_memory (category, value, weight, last_used)
+                    VALUES (?, ?, ?, ?)
+                """, (category, value, 1, datetime.now().isoformat()))
+
+            conn.commit()
+
+    def get_semantic_memory(self, category: str) -> List[str]:
+        """Retrieve memories by category sorted by importance"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT value FROM semantic_memory
+                WHERE category=?
+                ORDER BY weight DESC
+            """, (category,))
+
+            return [r[0] for r in cursor.fetchall()]
+
+    def get_all_semantic(self) -> Dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT category, value, weight FROM semantic_memory
+            """)
+
+            data = {}
+            for cat, val, w in cursor.fetchall():
+                data.setdefault(cat, []).append({"value": val, "weight": w})
+
+            return data
+
+    # ---------------- 🧠 SMART MEMORY QUERY ----------------
+
+    def recall_relevant(self, text: str) -> Dict:
+        """
+        Finds relevant memory automatically based on input
+        """
+
+        text = text.lower()
+
+        result = {
+            "name": self.get_profile("name"),
+            "likes": self.get_semantic_memory("likes"),
+            "dislikes": self.get_semantic_memory("dislikes"),
+            "topics": []
         }
 
-        self.logger.info("Assistant ready with Memory 3.0")
+        # keyword matching expansion
+        keywords = ["ai", "coding", "anime", "music", "game", "python", "robot"]
 
-    # =========================================================
-    # 🧠 PERSONALITY LEARNING
-    # =========================================================
+        for k in keywords:
+            if k in text:
+                result["topics"].extend(self.get_semantic_memory("interests"))
 
-    def _update_personality(self, text: str):
+        return result
+
+    # ---------------- AUTO LEARNING ----------------
+
+    def auto_learn(self, text: str):
+        """Extract memory intelligently"""
+
         t = text.lower()
 
-        if any(w in t for w in ["bro", "dude", "lol", "haha"]):
-            self.personality_cache["tone"] = "casual"
-
-        if any(w in t for w in ["please", "kindly", "thank you"]):
-            self.personality_cache["tone"] = "formal"
-
-        interests = ["ai", "coding", "python", "games", "anime",
-                     "robot", "music", "football", "science"]
-
-        for i in interests:
-            if i in t and i not in self.personality_cache["interests"]:
-                self.personality_cache["interests"].append(i)
-
-        if "short answer" in t or "brief" in t:
-            self.personality_cache["communication_style"] = "concise"
-
-        if "explain" in t or "detail" in t:
-            self.personality_cache["communication_style"] = "detailed"
-
-    # =========================================================
-    # 🧠 MEMORY 3.0 EVENT CAPTURE (NEW)
-    # =========================================================
-
-    def _auto_event_capture(self, text: str):
-        t = text.lower()
-
-        # goals
-        if "i want to" in t:
-            self.memory.add_event("goal", text, importance=3)
-
-        # problems
-        if "problem" in t or "issue" in t:
-            self.memory.add_event("problem", text, importance=4)
-
-        # learning intent
-        if "how to" in t or "learn" in t:
-            self.memory.add_event("intent", text, importance=2)
-
-        # project tracking
-        if "my project" in t:
-            self.memory.add_event("project", text, importance=5)
-
-    # =========================================================
-    # 🧠 SYSTEM CONTEXT BUILDER
-    # =========================================================
-
-    def _build_system_context(self) -> str:
-        profile = self.memory.get_all_profile()
-        events = self.memory.get_events(limit=10)
-
-        lines = []
-
-        # profile memory
-        if profile:
-            lines.append("USER PROFILE MEMORY:")
-            for k, v in profile.items():
-                lines.append(f"- {k}: {v}")
-
-        # event memory
-        if events:
-            lines.append("\nIMPORTANT USER EVENTS:")
-            for e in events:
-                lines.append(f"- [{e['type']}] {e['content']}")
-
-        # personality
-        lines.append("\nUSER PERSONALITY:")
-        lines.append(f"- tone: {self.personality_cache['tone']}")
-        lines.append(f"- style: {self.personality_cache['communication_style']}")
-        lines.append(f"- interests: {', '.join(self.personality_cache['interests'])}")
-
-        return "\n".join(lines)
-
-    # =========================================================
-    # 🧠 AUTO MEMORY PIPELINE
-    # =========================================================
-
-    def _auto_memory_capture(self, text: str):
-        t = text.lower()
-
+        # name
         if "my name is" in t:
             name = text.split("my name is")[-1].strip()
-            self.memory.set_profile("name", name)
+            self.set_profile("name", name)
 
+        # likes
         if "i like" in t:
             value = text.split("i like")[-1].strip()
-            self.memory.set_profile("likes", value)
+            self.add_semantic_memory("likes", value)
 
+        # dislikes
         if "i hate" in t:
             value = text.split("i hate")[-1].strip()
-            self.memory.set_profile("dislikes", value)
+            self.add_semantic_memory("dislikes", value)
 
-        # personality learning
-        self._update_personality(text)
+        # interests
+        for word in ["ai", "coding", "anime", "music", "games", "python"]:
+            if word in t:
+                self.add_semantic_memory("interests", word)
 
-        # 🧠 NEW: event learning
-        self._auto_event_capture(text)
+    # ---------------- HISTORY ----------------
 
-    # =========================================================
-    # 🚀 MAIN PIPELINE
-    # =========================================================
+    def save_exchange(self, exchange: Dict):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO conversations (timestamp, user_message, assistant_message, metadata)
+                VALUES (?, ?, ?, ?)
+            """, (
+                exchange.get("timestamp"),
+                exchange.get("user"),
+                exchange.get("assistant"),
+                json.dumps(exchange.get("metadata", {}))
+            ))
+            conn.commit()
 
-    def process_input(self, user_input: str) -> str:
+    def get_history(self, limit: int = 10):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
 
-        try:
-            # 1. memory + event learning
-            self._auto_memory_capture(user_input)
+            cursor.execute("""
+                SELECT timestamp, user_message, assistant_message
+                FROM conversations
+                ORDER BY id DESC
+                LIMIT ?
+            """, (limit,))
 
-            # 2. email routing
-            if self.email and self._is_email_query(user_input):
-                return self._handle_email_query(user_input)
+            rows = cursor.fetchall()
 
-            # 3. context
-            context = self.conversation.get_context()
-
-            # 4. inject system intelligence
-            system_context = self._build_system_context()
-
-            if system_context:
-                context.insert(0, {
-                    "role": "system",
-                    "content": system_context
-                })
-
-            # 5. generate response
-            response = self.llm.generate_response(user_input, context)
-
-            # 6. save memory
-            self.conversation.add_exchange(user_input, response)
-
-            return response
-
-        except Exception as e:
-            self.logger.error(f"Processing error: {e}")
-            return f"Error: {str(e)}"
-
-    # =========================================================
-    # 📧 EMAIL SYSTEM
-    # =========================================================
-
-    def _is_email_query(self, text: str) -> bool:
-        keywords = ["email", "mail", "gmail", "inbox", "unread", "send", "from:"]
-        return any(k in text.lower() for k in keywords)
-
-    def _handle_email_query(self, user_input: str) -> str:
-        try:
-            text = user_input.lower()
-
-            if "unread" in text or "check" in text:
-                return self.email.get_email_summary()
-
-            if "from:" in text:
-                sender = text.split("from:")[1].split()[0]
-                emails = self.email.get_emails_from(sender)
-
-                if not emails:
-                    return f"No emails found from {sender}"
-
-                return "\n".join(
-                    f"- {e.get('subject','No Subject')} ({e.get('date','')})"
-                    for e in emails
-                )
-
-            return self.email.get_email_summary()
-
-        except Exception as e:
-            return f"Email error: {e}"
-
-    def send_email(self, to: str, subject: str, body: str) -> bool:
-        return self.email.send_email(to, subject, body) if self.email else False
-
-    # =========================================================
-    # 🧠 MEMORY CONTROL
-    # =========================================================
-
-    def remember(self, key: str, value: str):
-        self.memory.set_profile(key, value)
-
-    def recall(self, key: str):
-        return self.memory.get_profile(key)
-
-    def show_memory(self):
-        return {
-            "profile": self.memory.get_all_profile(),
-            "events": self.memory.get_events(),
-            "personality": self.personality_cache
-        }
-
-    # =========================================================
-    # 🧾 HISTORY
-    # =========================================================
-
-    def show_history(self, limit: int = 10):
-        history = self.conversation.get_history(limit)
-
-        if not history:
-            print("No history found.")
-            return
-
-        print("\n🧠 Conversation History")
-        print("=" * 40)
-
-        for i, h in enumerate(history, 1):
-            print(f"\n[{i}] {h['timestamp']}")
-            print(f"You: {h['user'][:80]}")
-            print(f"AI: {h['assistant'][:80]}")
+            return list(reversed([
+                {
+                    "timestamp": r[0],
+                    "user": r[1],
+                    "assistant": r[2]
+                }
+                for r in rows
+            ]))
 
     def clear_history(self):
-        self.conversation.clear_history()
-        self.logger.info("History cleared")
-
-    # =========================================================
-    # ⚙️ CONFIG
-    # =========================================================
-
-    def show_config(self):
-        print("\n⚙️ System Status")
-        print("=" * 30)
-
-        print("OpenAI:", bool(os.getenv("OPENAI_API_KEY")))
-        print("Ollama:", True)
-        print("Email:", bool(self.email))
-
-        print("\n🧠 MEMORY:")
-        print(self.memory.get_all_profile())
-
-        print("\n📌 EVENTS:")
-        print(self.memory.get_events())
-
-        print("\n🧬 PERSONALITY:")
-        print(self.personality_cache)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM conversations")
+            conn.commit()
