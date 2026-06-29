@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 2.0 Upgrade (Stable + Fixed)
+Main Assistant Class - Memory 2.5 Upgrade (Personality Learning System)
 """
 
 import os
@@ -15,11 +15,11 @@ load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with persistent memory + context awareness"""
+    """AI Assistant with persistent memory + personality learning"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 2.0)...")
+        self.logger.info("Initializing PersonalAssistant (Memory 2.5 - Personality Learning)...")
 
         # Core systems
         self.memory = MemoryManager()
@@ -35,74 +35,138 @@ class PersonalAssistant:
             self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        self.logger.info("Assistant ready with Memory 2.0")
+        # Personality state (runtime)
+        self.personality_cache = {
+            "tone": None,
+            "communication_style": None,
+            "interests": [],
+        }
 
-    # ---------------- MEMORY BUILD ----------------
+        self.logger.info("Assistant ready with Personality Learning")
 
-    def _build_memory_context(self) -> str:
-        """Convert stored memory into readable system prompt"""
+    # ---------------- PERSONALITY BUILDER ----------------
+
+    def _update_personality(self, text: str):
+        """
+        Learns how the user behaves and speaks
+        """
+
+        t = text.lower()
+
+        # tone detection
+        if any(word in t for word in ["bro", "dude", "lol", "haha"]):
+            self.personality_cache["tone"] = "casual"
+
+        if any(word in t for word in ["please", "kindly", "thank you"]):
+            self.personality_cache["tone"] = "formal"
+
+        # interest detection
+        interests = [
+            "ai", "coding", "python", "games", "anime",
+            "robot", "music", "football", "science"
+        ]
+
+        for i in interests:
+            if i in t:
+                if i not in self.personality_cache["interests"]:
+                    self.personality_cache["interests"].append(i)
+
+        # writing style preference
+        if "short answer" in t or "brief" in t:
+            self.personality_cache["communication_style"] = "concise"
+
+        if "explain" in t or "detail" in t:
+            self.personality_cache["communication_style"] = "detailed"
+
+    # ---------------- MEMORY + PERSONALITY CONTEXT ----------------
+
+    def _build_system_context(self) -> str:
+        """
+        Combines:
+        - stored memory
+        - learned personality
+        """
+
         profile = self.memory.get_all_profile()
 
-        if not profile:
-            return ""
+        lines = []
 
-        lines = ["User Persistent Memory:"]
+        # user profile memory
+        if profile:
+            lines.append("User Memory:")
+            for k, v in profile.items():
+                if v:
+                    lines.append(f"- {k}: {v}")
 
-        for k, v in profile.items():
-            if v:
-                lines.append(f"- {k}: {v}")
+        # personality learning
+        lines.append("\nUser Personality Profile:")
+
+        tone = self.personality_cache["tone"]
+        style = self.personality_cache["communication_style"]
+        interests = self.personality_cache["interests"]
+
+        if tone:
+            lines.append(f"- tone: {tone}")
+        if style:
+            lines.append(f"- style: {style}")
+        if interests:
+            lines.append(f"- interests: {', '.join(interests)}")
 
         return "\n".join(lines)
 
-    # ---------------- AUTO MEMORY LEARNING ----------------
+    # ---------------- AUTO MEMORY CAPTURE ----------------
 
     def _auto_memory_capture(self, text: str):
-        """Lightweight memory extraction"""
+        """Extract long-term memory facts"""
 
-        t = text.lower().strip()
+        t = text.lower()
 
-        # name
+        # name memory
         if "my name is" in t:
-            name = text.lower().split("my name is")[-1].strip()
+            name = text.split("my name is")[-1].strip()
             self.memory.set_profile("name", name)
 
-        # preferences
+        # preference memory
         if "i like" in t:
-            value = text.lower().split("i like")[-1].strip()
+            value = text.split("i like")[-1].strip()
             self.memory.set_profile("likes", value)
 
         if "i hate" in t:
-            value = text.lower().split("i hate")[-1].strip()
+            value = text.split("i hate")[-1].strip()
             self.memory.set_profile("dislikes", value)
+
+        # update personality learning
+        self._update_personality(text)
 
     # ---------------- MAIN PIPELINE ----------------
 
     def process_input(self, user_input: str) -> str:
-        """Main entry point"""
+        """Main reasoning pipeline"""
 
         try:
-            # 1. store memory automatically
+            # 1. learn from input
             self._auto_memory_capture(user_input)
 
             # 2. email routing
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 3. build conversation context
+            # 3. conversation context
             context = self.conversation.get_context()
 
-            # 4. inject memory safely (ONLY ONCE per request)
-            memory_context = self._build_memory_context()
-            if memory_context:
+            # 4. inject SYSTEM intelligence (memory + personality)
+            system_context = self._build_system_context()
+
+            if system_context:
                 context.insert(0, {
                     "role": "system",
-                    "content": memory_context
+                    "content": system_context
                 })
 
             # 5. generate response
             response = self.llm.generate_response(user_input, context)
 
-            # 6. save exchange
+            # 6. save conversation
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -151,16 +215,16 @@ class PersonalAssistant:
     # ---------------- MEMORY CONTROL ----------------
 
     def remember(self, key: str, value: str):
-        """Manual memory storage"""
         self.memory.set_profile(key, value)
 
     def recall(self, key: str):
-        """Manual memory retrieval"""
         return self.memory.get_profile(key)
 
     def show_memory(self):
-        """Show everything assistant remembers"""
-        return self.memory.get_all_profile()
+        return {
+            "profile": self.memory.get_all_profile(),
+            "personality": self.personality_cache
+        }
 
     # ---------------- HISTORY ----------------
 
@@ -210,3 +274,6 @@ class PersonalAssistant:
 
         print("\n🧠 Memory:")
         print(self.memory.get_all_profile())
+
+        print("\n🧬 Personality:")
+        print(self.personality_cache)
