@@ -1,5 +1,5 @@
 """
-Memory Management - Stores conversations + persistent user profile
+Memory Management - Stores conversations + persistent user profile (v3.0)
 """
 
 import sqlite3
@@ -17,7 +17,7 @@ logger = setup_logger(__name__)
 
 
 class MemoryManager:
-    """Manages persistent memory for assistant"""
+    """Persistent memory system for conversations + user profile"""
 
     def __init__(self, db_path: str = "data/history.db"):
         self.db_path = db_path
@@ -26,13 +26,14 @@ class MemoryManager:
     # ---------------- INIT ----------------
 
     def _ensure_db_exists(self) -> None:
+        """Create all required tables safely"""
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Conversations
-            cursor.execute('''
+            # Conversations table
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
@@ -40,59 +41,62 @@ class MemoryManager:
                     assistant_message TEXT NOT NULL,
                     metadata TEXT
                 )
-            ''')
+            """)
 
-            # Sessions
-            cursor.execute('''
+            # Sessions table (future use)
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_start TEXT NOT NULL,
                     session_end TEXT,
                     message_count INTEGER DEFAULT 0
                 )
-            ''')
+            """)
 
-            # PROFILE MEMORY (important)
-            cursor.execute('''
+            # PROFILE MEMORY (core upgrade)
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_profile (
                     key TEXT PRIMARY KEY,
                     value TEXT,
                     updated_at TEXT
                 )
-            ''')
+            """)
 
             conn.commit()
-            logger.info(f"Database initialized at {self.db_path}")
+            logger.info(f"Memory DB ready at {self.db_path}")
 
-    # ---------------- PROFILE MEMORY (2.0 CORE FEATURE) ----------------
+    # ---------------- PROFILE MEMORY (CORE FEATURE) ----------------
 
-    def set_profile(self, key: str, value: str):
-        """Store permanent user memory (name, preferences, etc.)"""
+    def set_profile(self, key: str, value: str) -> None:
+        """
+        Store permanent memory (e.g. name, preferences)
+        Example: set_profile("name", "Rohan")
+        """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('''
+                cursor.execute("""
                     INSERT INTO user_profile (key, value, updated_at)
                     VALUES (?, ?, ?)
                     ON CONFLICT(key) DO UPDATE SET
                         value=excluded.value,
                         updated_at=excluded.updated_at
-                ''', (key, value, datetime.now().isoformat()))
+                """, (key, value, datetime.now().isoformat()))
 
                 conn.commit()
 
         except Exception as e:
-            logger.error(f"Profile save error: {e}")
+            logger.error(f"set_profile error: {e}")
 
     def get_profile(self, key: str) -> Optional[str]:
-        """Get a stored user fact"""
+        """Retrieve a saved memory"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
                 cursor.execute(
-                    'SELECT value FROM user_profile WHERE key=?',
+                    "SELECT value FROM user_profile WHERE key=?",
                     (key,)
                 )
 
@@ -100,77 +104,104 @@ class MemoryManager:
                 return row[0] if row else None
 
         except Exception as e:
-            logger.error(f"Profile fetch error: {e}")
+            logger.error(f"get_profile error: {e}")
             return None
 
     def get_all_profile(self) -> Dict:
-        """Return full user memory profile"""
+        """Return full memory profile"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('SELECT key, value FROM user_profile')
+                cursor.execute("SELECT key, value FROM user_profile")
                 return dict(cursor.fetchall())
 
         except Exception as e:
-            logger.error(f"Profile fetch error: {e}")
+            logger.error(f"get_all_profile error: {e}")
             return {}
 
-    # ---------------- CONVERSATIONS ----------------
+    # ---------------- CONVERSATION MEMORY ----------------
 
     def save_exchange(self, exchange: Dict) -> None:
+        """Store chat history"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('''
-                    INSERT INTO conversations (timestamp, user_message, assistant_message, metadata)
+                cursor.execute("""
+                    INSERT INTO conversations (
+                        timestamp,
+                        user_message,
+                        assistant_message,
+                        metadata
+                    )
                     VALUES (?, ?, ?, ?)
-                ''', (
-                    exchange.get('timestamp'),
-                    exchange.get('user'),
-                    exchange.get('assistant'),
-                    json.dumps(exchange.get('metadata', {}))
+                """, (
+                    exchange.get("timestamp"),
+                    exchange.get("user"),
+                    exchange.get("assistant"),
+                    json.dumps(exchange.get("metadata", {}))
                 ))
 
                 conn.commit()
 
         except Exception as e:
-            logger.error(f"Error saving exchange: {e}")
+            logger.error(f"save_exchange error: {e}")
 
     def get_history(self, limit: int = 10) -> List[Dict]:
+        """Get recent conversations"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('''
+                cursor.execute("""
                     SELECT timestamp, user_message, assistant_message, metadata
                     FROM conversations
-                    ORDER BY timestamp DESC
+                    ORDER BY id DESC
                     LIMIT ?
-                ''', (limit,))
+                """, (limit,))
 
                 rows = cursor.fetchall()
 
                 return list(reversed([
                     {
-                        'timestamp': r[0],
-                        'user': r[1],
-                        'assistant': r[2],
-                        'metadata': json.loads(r[3]) if r[3] else {}
+                        "timestamp": r[0],
+                        "user": r[1],
+                        "assistant": r[2],
+                        "metadata": json.loads(r[3]) if r[3] else {}
                     }
                     for r in rows
                 ]))
 
         except Exception as e:
-            logger.error(f"Error retrieving history: {e}")
+            logger.error(f"get_history error: {e}")
             return []
 
     def clear_history(self) -> None:
+        """Delete chat history only (not memory)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute('DELETE FROM conversations')
+                cursor.execute("DELETE FROM conversations")
                 conn.commit()
+
         except Exception as e:
-            logger.error(f"Error clearing history: {e}")
+            logger.error(f"clear_history error: {e}")
+
+    # ---------------- SMART MEMORY HELPERS ----------------
+
+    def remember_name(self, name: str) -> None:
+        """Shortcut: store user name"""
+        self.set_profile("name", name)
+
+    def get_name(self) -> Optional[str]:
+        """Shortcut: get remembered name"""
+        return self.get_profile("name")
+
+    def remember_fact(self, key: str, value: str) -> None:
+        """Generic memory storage"""
+        self.set_profile(key, value)
+
+    def recall_fact(self, key: str) -> Optional[str]:
+        """Generic memory retrieval"""
+        return self.get_profile(key)
