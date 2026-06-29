@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 2.0 Upgrade (Persistent User Memory + Context Injection)
+Main Assistant Class - Memory 2.0 Upgrade (Stable + Fixed)
 """
 
 import os
@@ -13,8 +13,6 @@ from src.utils.logger import setup_logger
 
 load_dotenv()
 
-logger = setup_logger(__name__)
-
 
 class PersonalAssistant:
     """AI Assistant with persistent memory + context awareness"""
@@ -27,7 +25,7 @@ class PersonalAssistant:
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
 
-        # LLM (Ollama)
+        # LLM
         self.llm = OllamaIntegration()
 
         # Email (optional)
@@ -37,23 +35,45 @@ class PersonalAssistant:
             self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        # Load persistent memory into context
-        self._load_user_memory()
-
         self.logger.info("Assistant ready with Memory 2.0")
 
-    # ---------------- MEMORY LOADING ----------------
+    # ---------------- MEMORY BUILD ----------------
 
-    def _load_user_memory(self):
-        """Load persistent memory into system context"""
+    def _build_memory_context(self) -> str:
+        """Convert stored memory into readable system prompt"""
         profile = self.memory.get_all_profile()
 
-        if profile:
-            memory_text = "User Profile Memory:\n"
-            for k, v in profile.items():
-                memory_text += f"- {k}: {v}\n"
+        if not profile:
+            return ""
 
-            self.conversation.add_system_context(memory_text)
+        lines = ["User Persistent Memory:"]
+
+        for k, v in profile.items():
+            if v:
+                lines.append(f"- {k}: {v}")
+
+        return "\n".join(lines)
+
+    # ---------------- AUTO MEMORY LEARNING ----------------
+
+    def _auto_memory_capture(self, text: str):
+        """Lightweight memory extraction"""
+
+        t = text.lower().strip()
+
+        # name
+        if "my name is" in t:
+            name = text.lower().split("my name is")[-1].strip()
+            self.memory.set_profile("name", name)
+
+        # preferences
+        if "i like" in t:
+            value = text.lower().split("i like")[-1].strip()
+            self.memory.set_profile("likes", value)
+
+        if "i hate" in t:
+            value = text.lower().split("i hate")[-1].strip()
+            self.memory.set_profile("dislikes", value)
 
     # ---------------- MAIN PIPELINE ----------------
 
@@ -61,28 +81,28 @@ class PersonalAssistant:
         """Main entry point"""
 
         try:
-            # 1. Check if user is storing memory explicitly
+            # 1. store memory automatically
             self._auto_memory_capture(user_input)
 
-            # 2. Email routing
+            # 2. email routing
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 3. Build context
+            # 3. build conversation context
             context = self.conversation.get_context()
 
-            # 4. Add memory snapshot dynamically (VERY IMPORTANT)
-            profile = self.memory.get_all_profile()
-            if profile:
+            # 4. inject memory safely (ONLY ONCE per request)
+            memory_context = self._build_memory_context()
+            if memory_context:
                 context.insert(0, {
                     "role": "system",
-                    "content": f"User memory: {profile}"
+                    "content": memory_context
                 })
 
-            # 5. Generate response
+            # 5. generate response
             response = self.llm.generate_response(user_input, context)
 
-            # 6. Save conversation
+            # 6. save exchange
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -90,30 +110,6 @@ class PersonalAssistant:
         except Exception as e:
             self.logger.error(f"Processing error: {e}")
             return f"Error: {str(e)}"
-
-    # ---------------- MEMORY AUTO LEARNING ----------------
-
-    def _auto_memory_capture(self, text: str):
-        """
-        Extract simple memory patterns automatically
-        (v2.0 lightweight memory learning)
-        """
-
-        text_lower = text.lower()
-
-        # NAME MEMORY
-        if "my name is" in text_lower:
-            name = text.split("is")[-1].strip()
-            self.memory.set_profile("name", name)
-
-        # PREFERENCE MEMORY
-        if "i like" in text_lower:
-            pref = text.split("like")[-1].strip()
-            self.memory.set_profile("likes", pref)
-
-        if "i hate" in text_lower:
-            dislike = text.split("hate")[-1].strip()
-            self.memory.set_profile("dislikes", dislike)
 
     # ---------------- EMAIL ----------------
 
@@ -148,7 +144,23 @@ class PersonalAssistant:
     # ---------------- EMAIL API ----------------
 
     def send_email(self, to: str, subject: str, body: str) -> bool:
-        return self.email.send_email(to, subject, body) if self.email else False
+        if not self.email:
+            return False
+        return self.email.send_email(to, subject, body)
+
+    # ---------------- MEMORY CONTROL ----------------
+
+    def remember(self, key: str, value: str):
+        """Manual memory storage"""
+        self.memory.set_profile(key, value)
+
+    def recall(self, key: str):
+        """Manual memory retrieval"""
+        return self.memory.get_profile(key)
+
+    def show_memory(self):
+        """Show everything assistant remembers"""
+        return self.memory.get_all_profile()
 
     # ---------------- HISTORY ----------------
 
@@ -170,20 +182,6 @@ class PersonalAssistant:
     def clear_history(self):
         self.conversation.clear_history()
         self.logger.info("History cleared")
-
-    # ---------------- MEMORY CONTROL ----------------
-
-    def remember(self, key: str, value: str):
-        """Manual memory storage"""
-        self.memory.set_profile(key, value)
-
-    def recall(self, key: str):
-        """Manual memory retrieval"""
-        return self.memory.get_profile(key)
-
-    def show_memory(self):
-        """Show everything assistant remembers"""
-        return self.memory.get_all_profile()
 
     # ---------------- TASKS ----------------
 
