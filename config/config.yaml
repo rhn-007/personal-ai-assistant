@@ -1,43 +1,51 @@
 # Personal AI Assistant Configuration
 
-# Assistant Settings
 assistant:
   name: "PersonalAI"
   version: "1.0.0"
-  description: "Your personal AI assistant for task automation and conversation"
-  
-# OpenAI Settings
-openai:
-  model: "gpt-4o-mini"
+  description: "Your personal AI assistant running fully on Ollama"
+
+# Local LLM Settings (Ollama)
+llm:
+  provider: "ollama"
+  model: "phi3"
   temperature: 0.7
   max_tokens: 2000
-  
+
 # Conversation Settings
 conversation:
   history_limit: 100
   context_window: 10
   enable_history_search: true
-  
+
 # Integrations
 integrations:
+
+  # ❌ OpenAI disabled completely
   openai:
+    enabled: false
+
+  # ✅ Ollama enabled
+  ollama:
     enabled: true
-  
+    model: "phi3"
+
+  # Email still optional
   email:
     enabled: true
     service: "gmail"
-    check_interval: 300  # seconds
-    
+    check_interval: 300
+
   slack:
     enabled: false
-    sync_interval: 300  # seconds
-  
+    sync_interval: 300
+
   calendar:
     enabled: false
-  
+
   weather:
     enabled: false
-  
+
   twitter:
     enabled: false
 
@@ -45,18 +53,18 @@ integrations:
 tasks:
   enabled: true
   scheduler: "apscheduler"
-  
+
   scheduled_tasks:
     - name: "Daily Briefing"
       trigger: "cron"
       hour: 8
       minute: 0
-      
+
     - name: "Email Digest"
       trigger: "cron"
       hour: 18
       minute: 0
-  
+
 # Logging
 logging:
   level: "INFO"
