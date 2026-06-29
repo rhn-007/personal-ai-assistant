@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """
-Personal AI Assistant - Main Entry Point (Updated with Email)
+Personal AI Assistant - Main Entry Point
 """
 
-import os
 import sys
 from dotenv import load_dotenv
 import typer
-from typing import Optional
 
 # Load environment variables
 load_dotenv()
 
-
+# Correct package imports
 from src.core.assistant import PersonalAssistant
-from utils.logger import setup_logger
+from src.utils.logger import setup_logger
 
 # Setup logging
 logger = setup_logger(__name__)
@@ -39,39 +37,38 @@ def chat():
     """Start interactive chat mode"""
     init_assistant()
     logger.info("Starting chat mode. Type 'quit' to exit, 'help' for commands.")
-    
+
     print("\n🤖 Personal AI Assistant")
     print("=" * 50)
     print("Type 'help' for available commands or 'quit' to exit\n")
-    
+
     try:
         while True:
             user_input = input("You: ").strip()
-            
+
             if not user_input:
                 continue
-            
-            if user_input.lower() == 'quit':
+
+            if user_input.lower() == "quit":
                 print("👋 Goodbye!")
                 break
-            
-            if user_input.lower() == 'help':
+
+            if user_input.lower() == "help":
                 print_help()
                 continue
-            
-            if user_input.lower() == 'history':
+
+            if user_input.lower() == "history":
                 assistant.show_history()
                 continue
-            
-            if user_input.lower() == 'clear':
+
+            if user_input.lower() == "clear":
                 assistant.clear_history()
                 print("✓ Conversation history cleared")
                 continue
-            
-            # Get response from assistant
+
             response = assistant.process_input(user_input)
             print(f"\nAssistant: {response}\n")
-            
+
     except KeyboardInterrupt:
         print("\n\n👋 Goodbye!")
     except Exception as e:
@@ -80,12 +77,14 @@ def chat():
 
 
 @app.command()
-def ask(question: str = typer.Argument(..., help="Question to ask the assistant")):
+def ask(question: str):
     """Ask a single question"""
     init_assistant()
+
     try:
         response = assistant.process_input(question)
         print(f"\nAssistant: {response}\n")
+
     except Exception as e:
         logger.error(f"Error processing question: {e}")
         print(f"❌ Error: {e}")
@@ -95,6 +94,7 @@ def ask(question: str = typer.Argument(..., help="Question to ask the assistant"
 def tasks():
     """Show configured tasks"""
     init_assistant()
+
     try:
         assistant.show_tasks()
     except Exception as e:
@@ -106,6 +106,7 @@ def tasks():
 def config():
     """Show current configuration"""
     init_assistant()
+
     try:
         assistant.show_config()
     except Exception as e:
@@ -114,12 +115,14 @@ def config():
 
 
 @app.command()
-def execute_task(task_name: str = typer.Argument(..., help="Name of task to execute")):
+def execute_task(task_name: str):
     """Execute a specific task"""
     init_assistant()
+
     try:
         assistant.execute_task(task_name)
         print(f"✓ Task '{task_name}' executed successfully")
+
     except Exception as e:
         logger.error(f"Error executing task: {e}")
         print(f"❌ Error: {e}")
@@ -129,11 +132,13 @@ def execute_task(task_name: str = typer.Argument(..., help="Name of task to exec
 def email_check():
     """Check and display unread emails"""
     init_assistant()
+
     try:
         if assistant.email:
             assistant.execute_task("check_emails")
         else:
-            print("❌ Email integration not available. Please configure Gmail credentials.")
+            print("❌ Email integration not available.")
+
     except Exception as e:
         logger.error(f"Error checking emails: {e}")
         print(f"❌ Error: {e}")
@@ -141,17 +146,21 @@ def email_check():
 
 @app.command()
 def email_send(
-    to: str = typer.Argument(..., help="Recipient email address"),
-    subject: str = typer.Option(..., prompt=True, help="Email subject"),
-    body: str = typer.Option(..., prompt=True, help="Email body")
+    to: str,
+    subject: str,
+    body: str
 ):
     """Send an email"""
     init_assistant()
+
     try:
-        if assistant.send_email(to, subject, body):
+        success = assistant.send_email(to, subject, body)
+
+        if success:
             print(f"✓ Email sent to {to}")
         else:
             print("❌ Failed to send email")
+
     except Exception as e:
         logger.error(f"Error sending email: {e}")
         print(f"❌ Error: {e}")
@@ -159,49 +168,27 @@ def email_send(
 
 @app.command()
 def version():
-    """Show version information"""
+    """Show version"""
     print("Personal AI Assistant v1.0.0")
 
 
 def print_help():
-    """Print help information"""
-    help_text = """
-📚 Available Commands:
-  help          - Show this help message
-  history       - View conversation history
-  clear         - Clear conversation history
-  tasks         - Show configured automation tasks
-  config        - Show current configuration
-  quit          - Exit the assistant
-
-💼 Email Commands:
-  check unread  - Check unread emails
-  send email    - Send an email
-  emails from X - Get emails from specific person
-
-💡 Usage Examples:
-  What's the weather today?
-  Remind me to call Mom at 5 PM
-  Summarize the file report.pdf
-  Post a tweet about AI
-  Check my unread emails
-  Send me an email summary
-
-🔧 CLI Commands:
-  python main.py chat                    - Start interactive mode
-  python main.py ask "question"          - Ask a single question
-  python main.py tasks                   - Show tasks
-  python main.py execute-task "task"     - Execute a task
-  python main.py email-check            - Check unread emails
-  python main.py email-send [to]         - Send an email
-  python main.py config                  - Show configuration
-  python main.py version                 - Show version
-"""
-    print(help_text)
+    """Help menu"""
+    print("""
+📚 Commands:
+  chat              Start interactive mode
+  ask "question"    Ask a question
+  tasks             Show tasks
+  config            Show configuration
+  email-check       Check emails
+  email-send        Send email
+  version           Show version
+  help              Show help
+  quit              Exit chat
+""")
 
 
 if __name__ == "__main__":
-    # Check if no arguments provided, start chat mode
     if len(sys.argv) == 1:
         init_assistant()
         chat()
