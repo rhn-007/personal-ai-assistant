@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 3.0 Upgrade (Personality + Event-Based Memory)
+Main Assistant Class - Memory 4.0 Upgrade (Semantic + Event + Profile Memory)
 """
 
 import os
@@ -15,11 +15,11 @@ load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Persistent Memory + Personality + Event Learning"""
+    """AI Assistant with Memory 4.0 (Profile + Events + Semantic Retrieval)"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 3.0)...")
+        self.logger.info("Initializing PersonalAssistant (Memory 4.0)...")
 
         # Core systems
         self.memory = MemoryManager()
@@ -35,14 +35,14 @@ class PersonalAssistant:
             self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        # Personality state
+        # Personality cache (unchanged)
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-        self.logger.info("Assistant ready with Memory 3.0")
+        self.logger.info("Assistant ready with Memory 4.0")
 
     # =========================================================
     # 🧠 PERSONALITY LEARNING
@@ -57,8 +57,10 @@ class PersonalAssistant:
         if any(w in t for w in ["please", "kindly", "thank you"]):
             self.personality_cache["tone"] = "formal"
 
-        interests = ["ai", "coding", "python", "games", "anime",
-                     "robot", "music", "football", "science"]
+        interests = [
+            "ai", "coding", "python", "games", "anime",
+            "robot", "music", "football", "science"
+        ]
 
         for i in interests:
             if i in t and i not in self.personality_cache["interests"]:
@@ -71,55 +73,49 @@ class PersonalAssistant:
             self.personality_cache["communication_style"] = "detailed"
 
     # =========================================================
-    # 🧠 MEMORY 3.0 EVENT CAPTURE (NEW)
+    # 🧠 EVENT MEMORY (3.0 CORE STILL ACTIVE)
     # =========================================================
 
     def _auto_event_capture(self, text: str):
         t = text.lower()
 
-        # goals
         if "i want to" in t:
             self.memory.add_event("goal", text, importance=3)
 
-        # problems
         if "problem" in t or "issue" in t:
             self.memory.add_event("problem", text, importance=4)
 
-        # learning intent
         if "how to" in t or "learn" in t:
             self.memory.add_event("intent", text, importance=2)
 
-        # project tracking
         if "my project" in t:
             self.memory.add_event("project", text, importance=5)
 
     # =========================================================
-    # 🧠 SYSTEM CONTEXT BUILDER
+    # 🧠 MEMORY 4.0 RETRIEVAL ENGINE (NEW CORE)
     # =========================================================
 
-    def _build_system_context(self) -> str:
-        profile = self.memory.get_all_profile()
-        events = self.memory.get_events(limit=10)
+    def _get_memory_context(self, query: str) -> str:
+        """
+        Memory 4.0 smart retrieval layer
+        (Profile + Events + future semantic memory hook)
+        """
 
-        lines = []
+        memory = self.memory.retrieve_relevant_memory(query)
 
-        # profile memory
-        if profile:
-            lines.append("USER PROFILE MEMORY:")
-            for k, v in profile.items():
+        lines = ["🧠 USER LONG-TERM MEMORY"]
+
+        # PROFILE MEMORY
+        if memory.get("profile"):
+            lines.append("\nProfile:")
+            for k, v in memory["profile"].items():
                 lines.append(f"- {k}: {v}")
 
-        # event memory
-        if events:
-            lines.append("\nIMPORTANT USER EVENTS:")
-            for e in events:
+        # EVENT MEMORY
+        if memory.get("events"):
+            lines.append("\nImportant Events:")
+            for e in memory["events"]:
                 lines.append(f"- [{e['type']}] {e['content']}")
-
-        # personality
-        lines.append("\nUSER PERSONALITY:")
-        lines.append(f"- tone: {self.personality_cache['tone']}")
-        lines.append(f"- style: {self.personality_cache['communication_style']}")
-        lines.append(f"- interests: {', '.join(self.personality_cache['interests'])}")
 
         return "\n".join(lines)
 
@@ -145,7 +141,7 @@ class PersonalAssistant:
         # personality learning
         self._update_personality(text)
 
-        # 🧠 NEW: event learning
+        # event capture
         self._auto_event_capture(text)
 
     # =========================================================
@@ -155,29 +151,41 @@ class PersonalAssistant:
     def process_input(self, user_input: str) -> str:
 
         try:
-            # 1. memory + event learning
+            # 1. learn memory + events
             self._auto_memory_capture(user_input)
 
             # 2. email routing
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 3. context
+            # 3. base conversation context
             context = self.conversation.get_context()
 
-            # 4. inject system intelligence
-            system_context = self._build_system_context()
+            # 4. MEMORY 4.0 injection (NEW)
+            memory_context = self._get_memory_context(user_input)
 
-            if system_context:
-                context.insert(0, {
-                    "role": "system",
-                    "content": system_context
-                })
+            context.insert(0, {
+                "role": "system",
+                "content": memory_context
+            })
 
-            # 5. generate response
+            # 5. personality injection (optional enhancement)
+            personality_context = f"""
+USER PERSONALITY:
+- tone: {self.personality_cache['tone']}
+- style: {self.personality_cache['communication_style']}
+- interests: {', '.join(self.personality_cache['interests'])}
+""".strip()
+
+            context.insert(1, {
+                "role": "system",
+                "content": personality_context
+            })
+
+            # 6. generate response
             response = self.llm.generate_response(user_input, context)
 
-            # 6. save memory
+            # 7. save conversation
             self.conversation.add_exchange(user_input, response)
 
             return response
