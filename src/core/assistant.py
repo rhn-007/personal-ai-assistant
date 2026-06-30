@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 Upgrade (Semantic + Event + Profile Memory)
+Main Assistant Class - Memory 4.0 Upgrade (Fixed + Tool Ready Base)
 """
 
 import os
@@ -15,11 +15,11 @@ load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Memory 4.0 (Profile + Events + Semantic Retrieval)"""
+    """AI Assistant with Memory 4.0 (Fixed + Tool Ready)"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 4.0)...")
+        self.logger.info("Initializing PersonalAssistant (Memory 4.0 Fixed)...")
 
         # Core systems
         self.memory = MemoryManager()
@@ -35,7 +35,7 @@ class PersonalAssistant:
             self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        # Personality cache (unchanged)
+        # Personality cache
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
@@ -66,64 +66,53 @@ class PersonalAssistant:
             if i in t and i not in self.personality_cache["interests"]:
                 self.personality_cache["interests"].append(i)
 
-        if "short answer" in t or "brief" in t:
+        if "short answer" in t:
             self.personality_cache["communication_style"] = "concise"
 
-        if "explain" in t or "detail" in t:
+        if "detail" in t or "explain" in t:
             self.personality_cache["communication_style"] = "detailed"
 
     # =========================================================
-    # 🧠 EVENT MEMORY (3.0 CORE STILL ACTIVE)
-    # =========================================================
-
-    def _auto_event_capture(self, text: str):
-        t = text.lower()
-
-        if "i want to" in t:
-            self.memory.add_event("goal", text, importance=3)
-
-        if "problem" in t or "issue" in t:
-            self.memory.add_event("problem", text, importance=4)
-
-        if "how to" in t or "learn" in t:
-            self.memory.add_event("intent", text, importance=2)
-
-        if "my project" in t:
-            self.memory.add_event("project", text, importance=5)
-
-    # =========================================================
-    # 🧠 MEMORY 4.0 RETRIEVAL ENGINE (NEW CORE)
+    # 🧠 SEMANTIC MEMORY (FIXED FOR YOUR MEMORY 4.0)
     # =========================================================
 
     def _get_memory_context(self, query: str) -> str:
-        """
-        Memory 4.0 smart retrieval layer
-        (Profile + Events + future semantic memory hook)
-        """
 
-        memory = self.memory.retrieve_relevant_memory(query)
+        profile = self.memory.get_all_profile()
 
-        lines = ["🧠 USER LONG-TERM MEMORY"]
+        semantic = self.memory.get_semantic_memory("interests")
+        likes = self.memory.get_semantic_memory("likes")
+        dislikes = self.memory.get_semantic_memory("dislikes")
 
-        # PROFILE MEMORY
-        if memory.get("profile"):
-            lines.append("\nProfile:")
-            for k, v in memory["profile"].items():
+        lines = ["🧠 USER MEMORY CONTEXT"]
+
+        # PROFILE
+        if profile:
+            lines.append("\nProfile Memory:")
+            for k, v in profile.items():
                 lines.append(f"- {k}: {v}")
 
-        # EVENT MEMORY
-        if memory.get("events"):
-            lines.append("\nImportant Events:")
-            for e in memory["events"]:
-                lines.append(f"- [{e['type']}] {e['content']}")
+        # SEMANTIC MEMORY
+        if semantic:
+            lines.append("\nInterests:")
+            lines.append(", ".join(semantic))
+
+        if likes:
+            lines.append("\nLikes:")
+            lines.append(", ".join(likes))
+
+        if dislikes:
+            lines.append("\nDislikes:")
+            lines.append(", ".join(dislikes))
 
         return "\n".join(lines)
 
     # =========================================================
-    # 🧠 AUTO MEMORY PIPELINE
+    # 🧠 AUTO MEMORY CAPTURE (FIXED)
     # =========================================================
 
     def _auto_memory_capture(self, text: str):
+
         t = text.lower()
 
         if "my name is" in t:
@@ -132,17 +121,18 @@ class PersonalAssistant:
 
         if "i like" in t:
             value = text.split("i like")[-1].strip()
-            self.memory.set_profile("likes", value)
+            self.memory.add_semantic_memory("likes", value)
 
         if "i hate" in t:
             value = text.split("i hate")[-1].strip()
-            self.memory.set_profile("dislikes", value)
+            self.memory.add_semantic_memory("dislikes", value)
 
-        # personality learning
+        # interests auto-learning
+        for word in ["ai", "coding", "anime", "music", "games", "python"]:
+            if word in t:
+                self.memory.add_semantic_memory("interests", word)
+
         self._update_personality(text)
-
-        # event capture
-        self._auto_event_capture(text)
 
     # =========================================================
     # 🚀 MAIN PIPELINE
@@ -151,17 +141,17 @@ class PersonalAssistant:
     def process_input(self, user_input: str) -> str:
 
         try:
-            # 1. learn memory + events
+            # 1. memory learning
             self._auto_memory_capture(user_input)
 
             # 2. email routing
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 3. base conversation context
+            # 3. conversation context
             context = self.conversation.get_context()
 
-            # 4. MEMORY 4.0 injection (NEW)
+            # 4. inject memory
             memory_context = self._get_memory_context(user_input)
 
             context.insert(0, {
@@ -169,7 +159,7 @@ class PersonalAssistant:
                 "content": memory_context
             })
 
-            # 5. personality injection (optional enhancement)
+            # 5. inject personality
             personality_context = f"""
 USER PERSONALITY:
 - tone: {self.personality_cache['tone']}
@@ -185,7 +175,7 @@ USER PERSONALITY:
             # 6. generate response
             response = self.llm.generate_response(user_input, context)
 
-            # 7. save conversation
+            # 7. save
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -203,6 +193,7 @@ USER PERSONALITY:
         return any(k in text.lower() for k in keywords)
 
     def _handle_email_query(self, user_input: str) -> str:
+
         try:
             text = user_input.lower()
 
@@ -242,7 +233,7 @@ USER PERSONALITY:
     def show_memory(self):
         return {
             "profile": self.memory.get_all_profile(),
-            "events": self.memory.get_events(),
+            "semantic": self.memory.get_all_semantic(),
             "personality": self.personality_cache
         }
 
@@ -252,13 +243,6 @@ USER PERSONALITY:
 
     def show_history(self, limit: int = 10):
         history = self.conversation.get_history(limit)
-
-        if not history:
-            print("No history found.")
-            return
-
-        print("\n🧠 Conversation History")
-        print("=" * 40)
 
         for i, h in enumerate(history, 1):
             print(f"\n[{i}] {h['timestamp']}")
@@ -284,8 +268,8 @@ USER PERSONALITY:
         print("\n🧠 MEMORY:")
         print(self.memory.get_all_profile())
 
-        print("\n📌 EVENTS:")
-        print(self.memory.get_events())
+        print("\n🧠 SEMANTIC MEMORY:")
+        print(self.memory.get_all_semantic())
 
         print("\n🧬 PERSONALITY:")
         print(self.personality_cache)
