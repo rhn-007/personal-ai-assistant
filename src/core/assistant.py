@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 Upgrade (Semantic + Event + Tool System Ready)
+Main Assistant Class - Memory 4.0 + Tool System (Stage 2 Improved)
 """
 
 import os
@@ -11,7 +11,7 @@ from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
 
-# 🧠 TOOL SYSTEM (NEW)
+# 🧠 TOOL SYSTEM
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
 
@@ -19,24 +19,22 @@ load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Memory 4.0 + Tool Execution Layer"""
+    """AI Assistant with Memory 4.0 + Safe Tool Execution Layer"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 4.0 + Tools)...")
+        self.logger.info("Initializing PersonalAssistant (Stage 2 Tools)...")
 
         # =========================================================
         # CORE SYSTEMS
         # =========================================================
-
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
         self.llm = OllamaIntegration()
 
         # =========================================================
-        # OPTIONAL EMAIL INTEGRATION
+        # EMAIL INTEGRATION (FALLBACK LEGACY)
         # =========================================================
-
         try:
             self.email = EmailIntegration()
         except Exception as e:
@@ -46,7 +44,6 @@ class PersonalAssistant:
         # =========================================================
         # PERSONALITY CACHE
         # =========================================================
-
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
@@ -54,24 +51,18 @@ class PersonalAssistant:
         }
 
         # =========================================================
-        # 🔧 TOOL SYSTEM (STAGE 1)
+        # TOOL SYSTEM (STAGE 2 IMPROVED)
         # =========================================================
-
         self.tool_manager = ToolManager()
 
         # register tools
         self.tool_manager.register(EmailTool())
 
-        # =========================================================
-        # READY
-        # =========================================================
-
-        self.logger.info("Assistant ready with Memory 4.0 + Tools")
+        self.logger.info(f"Registered tools: {len(self.tool_manager.tools)}")
 
     # =========================================================
     # 🧠 PERSONALITY LEARNING
     # =========================================================
-
     def _update_personality(self, text: str):
         t = text.lower()
 
@@ -97,9 +88,8 @@ class PersonalAssistant:
             self.personality_cache["communication_style"] = "detailed"
 
     # =========================================================
-    # 🧠 MEMORY
+    # 🧠 MEMORY CONTEXT
     # =========================================================
-
     def _get_memory_context(self, query: str):
 
         profile = self.memory.get_all_profile()
@@ -123,7 +113,6 @@ class PersonalAssistant:
     # =========================================================
     # 🧠 AUTO MEMORY
     # =========================================================
-
     def _auto_memory_capture(self, text: str):
 
         t = text.lower()
@@ -147,9 +136,33 @@ class PersonalAssistant:
         self._update_personality(text)
 
     # =========================================================
-    # 🚀 MAIN PIPELINE (UPDATED WITH TOOLS)
+    # 🔧 TOOL EXECUTION LAYER (STAGE 2 FIXED)
     # =========================================================
+    def _run_tools(self, user_input: str):
 
+        try:
+            tool = self.tool_manager.get_tool(user_input)
+
+            if not tool:
+                return None
+
+            self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
+
+            result = tool.execute(user_input)
+
+            # prevent empty crashes
+            if result is None:
+                return None
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Tool execution error: {e}")
+            return None
+
+    # =========================================================
+    # 🚀 MAIN PIPELINE
+    # =========================================================
     def process_input(self, user_input: str) -> str:
 
         try:
@@ -157,25 +170,22 @@ class PersonalAssistant:
             self._auto_memory_capture(user_input)
 
             # =====================================================
-            # 🔧 TOOL EXECUTION LAYER (STAGE 1)
+            # TOOL LAYER (STAGE 2)
             # =====================================================
-
-            tool_result = self.tool_manager.execute(user_input)
+            tool_result = self._run_tools(user_input)
 
             if tool_result:
                 return tool_result
 
             # =====================================================
-            # EMAIL FALLBACK (legacy support)
+            # EMAIL LEGACY FALLBACK
             # =====================================================
-
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
             # =====================================================
             # LLM CONTEXT BUILD
             # =====================================================
-
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
@@ -193,7 +203,6 @@ USER PERSONALITY:
             # =====================================================
             # LLM RESPONSE
             # =====================================================
-
             response = self.llm.generate_response(user_input, context)
 
             self.conversation.add_exchange(user_input, response)
@@ -207,7 +216,6 @@ USER PERSONALITY:
     # =========================================================
     # 📧 EMAIL (LEGACY)
     # =========================================================
-
     def _is_email_query(self, text: str) -> bool:
         keywords = ["email", "mail", "gmail", "inbox", "unread", "send", "from:"]
         return any(k in text.lower() for k in keywords)
@@ -240,7 +248,6 @@ USER PERSONALITY:
     # =========================================================
     # 🧠 MEMORY CONTROL
     # =========================================================
-
     def remember(self, key: str, value: str):
         self.memory.set_profile(key, value)
 
@@ -257,7 +264,6 @@ USER PERSONALITY:
     # =========================================================
     # ⚙️ CONFIG
     # =========================================================
-
     def show_config(self):
         print("\n⚙️ System Status")
         print("=" * 30)
@@ -273,4 +279,4 @@ USER PERSONALITY:
         print(self.memory.get_all_semantic())
 
         print("\n🔧 TOOLS:")
-        print(self.tool_manager.tools)
+        print([t.__class__.__name__ for t in self.tool_manager.tools])
