@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 Upgrade (Fixed + Tool Ready Base)
+Main Assistant Class - Memory 4.0 Upgrade (Semantic + Event + Tool System Ready)
 """
 
 import os
@@ -11,38 +11,62 @@ from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
 
+# 🧠 TOOL SYSTEM (NEW)
+from src.tools.tool_manager import ToolManager
+from src.tools.email_tool import EmailTool
+
 load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Memory 4.0 (Fixed + Tool Ready)"""
+    """AI Assistant with Memory 4.0 + Tool Execution Layer"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Memory 4.0 Fixed)...")
+        self.logger.info("Initializing PersonalAssistant (Memory 4.0 + Tools)...")
 
-        # Core systems
+        # =========================================================
+        # CORE SYSTEMS
+        # =========================================================
+
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
-
-        # LLM
         self.llm = OllamaIntegration()
 
-        # Email (optional)
+        # =========================================================
+        # OPTIONAL EMAIL INTEGRATION
+        # =========================================================
+
         try:
             self.email = EmailIntegration()
         except Exception as e:
             self.logger.warning(f"Email disabled: {e}")
             self.email = None
 
-        # Personality cache
+        # =========================================================
+        # PERSONALITY CACHE
+        # =========================================================
+
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-        self.logger.info("Assistant ready with Memory 4.0")
+        # =========================================================
+        # 🔧 TOOL SYSTEM (STAGE 1)
+        # =========================================================
+
+        self.tool_manager = ToolManager()
+
+        # register tools
+        self.tool_manager.register(EmailTool())
+
+        # =========================================================
+        # READY
+        # =========================================================
+
+        self.logger.info("Assistant ready with Memory 4.0 + Tools")
 
     # =========================================================
     # 🧠 PERSONALITY LEARNING
@@ -73,42 +97,31 @@ class PersonalAssistant:
             self.personality_cache["communication_style"] = "detailed"
 
     # =========================================================
-    # 🧠 SEMANTIC MEMORY (FIXED FOR YOUR MEMORY 4.0)
+    # 🧠 MEMORY
     # =========================================================
 
-    def _get_memory_context(self, query: str) -> str:
+    def _get_memory_context(self, query: str):
 
         profile = self.memory.get_all_profile()
-
-        semantic = self.memory.get_semantic_memory("interests")
-        likes = self.memory.get_semantic_memory("likes")
-        dislikes = self.memory.get_semantic_memory("dislikes")
+        semantic = self.memory.get_all_semantic()
 
         lines = ["🧠 USER MEMORY CONTEXT"]
 
-        # PROFILE
         if profile:
             lines.append("\nProfile Memory:")
             for k, v in profile.items():
                 lines.append(f"- {k}: {v}")
 
-        # SEMANTIC MEMORY
         if semantic:
-            lines.append("\nInterests:")
-            lines.append(", ".join(semantic))
-
-        if likes:
-            lines.append("\nLikes:")
-            lines.append(", ".join(likes))
-
-        if dislikes:
-            lines.append("\nDislikes:")
-            lines.append(", ".join(dislikes))
+            lines.append("\nSemantic Memory:")
+            for cat, items in semantic.items():
+                values = ", ".join([i["value"] for i in items])
+                lines.append(f"- {cat}: {values}")
 
         return "\n".join(lines)
 
     # =========================================================
-    # 🧠 AUTO MEMORY CAPTURE (FIXED)
+    # 🧠 AUTO MEMORY
     # =========================================================
 
     def _auto_memory_capture(self, text: str):
@@ -127,15 +140,14 @@ class PersonalAssistant:
             value = text.split("i hate")[-1].strip()
             self.memory.add_semantic_memory("dislikes", value)
 
-        # interests auto-learning
-        for word in ["ai", "coding", "anime", "music", "games", "python"]:
-            if word in t:
-                self.memory.add_semantic_memory("interests", word)
+        for w in ["ai", "coding", "anime", "music", "games", "python"]:
+            if w in t:
+                self.memory.add_semantic_memory("interests", w)
 
         self._update_personality(text)
 
     # =========================================================
-    # 🚀 MAIN PIPELINE
+    # 🚀 MAIN PIPELINE (UPDATED WITH TOOLS)
     # =========================================================
 
     def process_input(self, user_input: str) -> str:
@@ -144,22 +156,30 @@ class PersonalAssistant:
             # 1. memory learning
             self._auto_memory_capture(user_input)
 
-            # 2. email routing
+            # =====================================================
+            # 🔧 TOOL EXECUTION LAYER (STAGE 1)
+            # =====================================================
+
+            tool_result = self.tool_manager.execute(user_input)
+
+            if tool_result:
+                return tool_result
+
+            # =====================================================
+            # EMAIL FALLBACK (legacy support)
+            # =====================================================
+
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 3. conversation context
+            # =====================================================
+            # LLM CONTEXT BUILD
+            # =====================================================
+
             context = self.conversation.get_context()
 
-            # 4. inject memory
             memory_context = self._get_memory_context(user_input)
 
-            context.insert(0, {
-                "role": "system",
-                "content": memory_context
-            })
-
-            # 5. inject personality
             personality_context = f"""
 USER PERSONALITY:
 - tone: {self.personality_cache['tone']}
@@ -167,15 +187,15 @@ USER PERSONALITY:
 - interests: {', '.join(self.personality_cache['interests'])}
 """.strip()
 
-            context.insert(1, {
-                "role": "system",
-                "content": personality_context
-            })
+            context.insert(0, {"role": "system", "content": memory_context})
+            context.insert(1, {"role": "system", "content": personality_context})
 
-            # 6. generate response
+            # =====================================================
+            # LLM RESPONSE
+            # =====================================================
+
             response = self.llm.generate_response(user_input, context)
 
-            # 7. save
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -185,7 +205,7 @@ USER PERSONALITY:
             return f"Error: {str(e)}"
 
     # =========================================================
-    # 📧 EMAIL SYSTEM
+    # 📧 EMAIL (LEGACY)
     # =========================================================
 
     def _is_email_query(self, text: str) -> bool:
@@ -197,18 +217,15 @@ USER PERSONALITY:
         try:
             text = user_input.lower()
 
-            if "unread" in text or "check" in text:
+            if "unread" in text:
                 return self.email.get_email_summary()
 
             if "from:" in text:
                 sender = text.split("from:")[1].split()[0]
                 emails = self.email.get_emails_from(sender)
 
-                if not emails:
-                    return f"No emails found from {sender}"
-
                 return "\n".join(
-                    f"- {e.get('subject','No Subject')} ({e.get('date','')})"
+                    f"- {e.get('subject','No Subject')}"
                     for e in emails
                 )
 
@@ -217,7 +234,7 @@ USER PERSONALITY:
         except Exception as e:
             return f"Email error: {e}"
 
-    def send_email(self, to: str, subject: str, body: str) -> bool:
+    def send_email(self, to: str, subject: str, body: str):
         return self.email.send_email(to, subject, body) if self.email else False
 
     # =========================================================
@@ -238,22 +255,6 @@ USER PERSONALITY:
         }
 
     # =========================================================
-    # 🧾 HISTORY
-    # =========================================================
-
-    def show_history(self, limit: int = 10):
-        history = self.conversation.get_history(limit)
-
-        for i, h in enumerate(history, 1):
-            print(f"\n[{i}] {h['timestamp']}")
-            print(f"You: {h['user'][:80]}")
-            print(f"AI: {h['assistant'][:80]}")
-
-    def clear_history(self):
-        self.conversation.clear_history()
-        self.logger.info("History cleared")
-
-    # =========================================================
     # ⚙️ CONFIG
     # =========================================================
 
@@ -268,8 +269,8 @@ USER PERSONALITY:
         print("\n🧠 MEMORY:")
         print(self.memory.get_all_profile())
 
-        print("\n🧠 SEMANTIC MEMORY:")
+        print("\n🧠 SEMANTIC:")
         print(self.memory.get_all_semantic())
 
-        print("\n🧬 PERSONALITY:")
-        print(self.personality_cache)
+        print("\n🔧 TOOLS:")
+        print(self.tool_manager.tools)
