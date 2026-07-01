@@ -10,6 +10,7 @@ from src.core.memory import MemoryManager
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
+from src.planner.planner import Planner
 
 # 🧠 TOOL SYSTEM
 from src.tools.tool_manager import ToolManager
