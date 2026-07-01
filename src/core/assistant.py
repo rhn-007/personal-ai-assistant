@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 + Tool System + Planner + Agent Loop (Stage 5)
+Main Assistant Class - Memory 4.0 + Tool System + Planner + Agent Loop (Stage 5 FIXED)
 """
 
 import os
@@ -26,7 +26,7 @@ load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Agent with Memory + Tools + Planner + Agent Loop (Stage 5)"""
+    """AI Agent with Memory + Tools + Planner + Agent Loop (Stage 5 FIXED)"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
@@ -63,12 +63,12 @@ class PersonalAssistant:
         self.tool_manager.register(EmailTool())
 
         # =====================================================
-        # PLANNER (Stage 4)
+        # PLANNER
         # =====================================================
         self.planner = Planner(self.tool_manager)
 
         # =====================================================
-        # AGENT LOOP (Stage 5)
+        # AGENT LOOP
         # =====================================================
         self.task_manager = TaskManager()
         self.agent_loop = AgentLoop(
@@ -82,7 +82,6 @@ class PersonalAssistant:
     # =========================================================
     # MEMORY CONTEXT
     # =========================================================
-
     def _get_memory_context(self, query: str):
         profile = self.memory.get_all_profile()
         semantic = self.memory.get_all_semantic()
@@ -105,7 +104,6 @@ class PersonalAssistant:
     # =========================================================
     # MEMORY LEARNING
     # =========================================================
-
     def _auto_memory_capture(self, text: str):
         t = text.lower()
 
@@ -125,7 +123,6 @@ class PersonalAssistant:
     # =========================================================
     # TOOL LAYER
     # =========================================================
-
     def _run_tools(self, user_input: str):
         try:
             tool = self.tool_manager.get_tool(user_input)
@@ -143,35 +140,40 @@ class PersonalAssistant:
     # =========================================================
     # PLANNER LAYER
     # =========================================================
-
     def _run_planner(self, user_input: str):
-        plan = self.planner.create_plan(user_input)
 
-        if not plan:
-            return None
+        try:
+            plan = self.planner.create_plan(user_input)
 
-        results = []
+            if not plan:
+                return None
 
-        for step in plan:
-            tool_name = step.get("tool")
-            query = step.get("input", user_input)
+            results = []
 
-            tool = self.tool_manager.get_tool(tool_name)
+            for step in plan:
 
-            if not tool:
-                continue
+                tool_name = step.get("tool")
+                query = step.get("input", user_input)
 
-            if tool:
+                tool = self.tool_manager.get_tool(tool_name)
+
+                if not tool:
+                    continue
+
                 output = tool.execute(query)
+
                 if output:
                     results.append(output)
 
-        return "\n".join([r for r in results if r])
+            return "\n".join(results) if results else None
+
+        except Exception as e:
+            self.logger.error(f"Planner error: {e}")
+            return None
 
     # =========================================================
-    # AGENT LOOP (HIGHEST LEVEL INTELLIGENCE)
+    # AGENT LOOP
     # =========================================================
-
     def _run_agent_loop(self, user_input: str):
         try:
             if not self.agent_loop:
@@ -184,45 +186,34 @@ class PersonalAssistant:
             return None
 
     # =========================================================
-    # MAIN PIPELINE (FINAL STAGE 5 ARCHITECTURE)
+    # MAIN PIPELINE
     # =========================================================
-
     def process_input(self, user_input: str) -> str:
 
         try:
-            # 1. MEMORY LEARNING
+            # 1. MEMORY
             self._auto_memory_capture(user_input)
 
-            # =====================================================
-            # 2. AGENT LOOP (HIGHEST PRIORITY)
-            # =====================================================
+            # 2. AGENT LOOP
             agent_result = self._run_agent_loop(user_input)
             if agent_result:
                 return agent_result
 
-            # =====================================================
-            # 3. DIRECT TOOL EXECUTION
-            # =====================================================
+            # 3. DIRECT TOOL
             tool_result = self._run_tools(user_input)
             if tool_result:
                 return tool_result
 
-            # =====================================================
-            # 4. PLANNER EXECUTION
-            # =====================================================
+            # 4. PLANNER
             plan_result = self._run_planner(user_input)
-            if plan_result and plan_result.strip():
+            if plan_result:
                 return plan_result
 
-            # =====================================================
-            # 5. EMAIL FALLBACK
-            # =====================================================
+            # 5. EMAIL
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # =====================================================
-            # 6. LLM CONTEXT BUILD
-            # =====================================================
+            # 6. LLM
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
@@ -237,9 +228,6 @@ USER PERSONALITY:
             context.insert(0, {"role": "system", "content": memory_context})
             context.insert(1, {"role": "system", "content": personality_context})
 
-            # =====================================================
-            # 7. LLM RESPONSE
-            # =====================================================
             response = self.llm.generate_response(user_input, context)
 
             self.conversation.add_exchange(user_input, response)
@@ -253,7 +241,6 @@ USER PERSONALITY:
     # =========================================================
     # EMAIL SYSTEM
     # =========================================================
-
     def _is_email_query(self, text: str):
         return any(k in text.lower() for k in ["email", "mail", "gmail", "inbox", "from:"])
 
@@ -273,7 +260,6 @@ USER PERSONALITY:
     # =========================================================
     # MEMORY CONTROL
     # =========================================================
-
     def remember(self, key, value):
         self.memory.set_profile(key, value)
 
@@ -290,7 +276,6 @@ USER PERSONALITY:
     # =========================================================
     # DEBUG
     # =========================================================
-
     def show_config(self):
         print("\n⚙️ SYSTEM STATUS")
         print("=" * 30)
