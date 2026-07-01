@@ -32,7 +32,6 @@ class MemoryManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Conversations
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +42,6 @@ class MemoryManager:
                 )
             """)
 
-            # Profile memory
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_profile (
                     key TEXT PRIMARY KEY,
@@ -52,7 +50,6 @@ class MemoryManager:
                 )
             """)
 
-            # Semantic memory
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS semantic_memory (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +60,6 @@ class MemoryManager:
                 )
             """)
 
-            # 🆕 EVENT MEMORY (MISSING BEFORE → FIXED)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,7 +143,27 @@ class MemoryManager:
             return [r[0] for r in cur.fetchall()]
 
     # =========================================================
-    # 🆕 EVENT SYSTEM (FIXED)
+    # 🆕 COMPATIBILITY LAYER (IMPORTANT FIX)
+    # =========================================================
+
+    def get_all_semantic(self) -> Dict:
+        """
+        FIX: used by Assistant + Planner + AgentLoop
+        """
+        return {
+            "likes": self.get_semantic_memory("likes"),
+            "dislikes": self.get_semantic_memory("dislikes"),
+            "interests": self.get_semantic_memory("interests"),
+        }
+
+    def get_all_semantic_flat(self) -> Dict:
+        """
+        Alternative flat structure (future planning use)
+        """
+        return self.get_all_semantic()
+
+    # =========================================================
+    # 🆕 EVENT SYSTEM
     # =========================================================
 
     def add_event(self, type: str, content: str, importance: int = 1):
@@ -179,12 +195,10 @@ class MemoryManager:
             ]
 
     # =========================================================
-    # 🧠 SMART MEMORY RETRIEVAL (FIXED)
+    # 🧠 SMART MEMORY RETRIEVAL
     # =========================================================
 
     def retrieve_relevant_memory(self, text: str) -> Dict:
-        text = text.lower()
-
         return {
             "profile": self.get_all_profile(),
             "events": self.get_events(),
@@ -214,7 +228,7 @@ class MemoryManager:
                 self.add_semantic_memory("interests", w)
 
     # =========================================================
-    # 🧾 HISTORY (UNCHANGED)
+    # 🧾 HISTORY
     # =========================================================
 
     def save_exchange(self, exchange: Dict):
@@ -256,4 +270,3 @@ class MemoryManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("DELETE FROM conversations")
             conn.commit()
-            
