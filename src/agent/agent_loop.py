@@ -5,10 +5,10 @@ from src.agent.task_manager import TaskManager
 
 class AgentLoop:
     """
-    Stage 5 Agent Loop:
-    - Plans tasks
-    - Executes tools step-by-step
-    - Tracks execution state safely
+    Stage 5 Agent Loop (FIXED)
+    - Safe planning
+    - Safe execution
+    - No string-based failure states
     """
 
     def __init__(
@@ -19,8 +19,6 @@ class AgentLoop:
     ):
 
         self.tool_manager = tool_manager
-
-        # use external or fallback
         self.planner = planner if planner else Planner(tool_manager)
         self.task_manager = task_manager if task_manager else TaskManager()
 
@@ -32,25 +30,30 @@ class AgentLoop:
 
         # 1. CREATE TASK
         task = self.task_manager.create_task(user_input)
-
         task_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
 
-        # 2. CREATE PLAN (FIXED)
+        # 2. CREATE PLAN (SAFE)
         plan = self.planner.create_plan(user_input)
 
-        if not plan:
-            return "No plan generated"
+        if not plan or not isinstance(plan, list):
+            return None   # ✅ FIX: NEVER return strings
 
         results = []
 
-        # 3. EXECUTE PLAN
+        # 3. EXECUTE PLAN STEP-BY-STEP
         for step in plan:
+
+            if not isinstance(step, dict):
+                continue
 
             tool_name = step.get("tool")
             query = step.get("input", user_input)
 
-            # safe tool lookup
-            tool = self.tool_manager.get_tool(tool_name) if tool_name else None
+            if not tool_name:
+                continue
+
+            # 🔥 SAFE TOOL LOOKUP
+            tool = self.tool_manager.get_tool(tool_name)
 
             if not tool:
                 continue
@@ -73,7 +76,11 @@ class AgentLoop:
             except Exception as e:
                 if task_id:
                     try:
-                        self.task_manager.update_task(task_id, step, f"ERROR: {str(e)}")
+                        self.task_manager.update_task(
+                            task_id,
+                            step,
+                            f"ERROR: {str(e)}"
+                        )
                     except Exception:
                         pass
 
@@ -84,4 +91,4 @@ class AgentLoop:
             except Exception:
                 pass
 
-        return "\n".join([r for r in results if r])
+        return "\n".join(results) if results else None
