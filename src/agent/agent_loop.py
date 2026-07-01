@@ -4,40 +4,73 @@ from src.agent.task_manager import TaskManager
 
 
 class AgentLoop:
+    """
+    Stage 5 Agent Loop:
+    - Plans tasks
+    - Executes tools step-by-step
+    - Tracks execution state
+    """
 
-    def __init__(self, tool_manager: ToolManager):
+    def __init__(self, tool_manager: ToolManager, planner: Planner = None, task_manager: TaskManager = None):
+
         self.tool_manager = tool_manager
-        self.planner = Planner(tool_manager)
-        self.task_manager = TaskManager()
+
+        # allow external planner OR create internal one
+        self.planner = planner if planner else Planner(tool_manager)
+
+        # allow external task manager OR create internal one
+        self.task_manager = task_manager if task_manager else TaskManager()
+
+    # =========================================================
+    # MAIN AGENT EXECUTION LOOP
+    # =========================================================
 
     def run(self, user_input: str):
 
-        # 1. Create task
+        # 1. CREATE TASK
         task = self.task_manager.create_task(user_input)
 
-        # 2. Create plan
+        task_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
+
+        # 2. CREATE PLAN
         plan = self.planner.create_plan(user_input)
 
         if not plan:
-            return "No plan generated"
+            return None
 
         results = []
 
-        # 3. Execute plan step-by-step
+        # 3. EXECUTE STEP-BY-STEP
         for step in plan:
 
             tool_name = step.get("tool")
             query = step.get("input", user_input)
 
-            tool = self.tool_manager.get_tool(query)
+            # ❌ FIXED: correct tool lookup
+            tool = self.tool_manager.get_tool(tool_name)
 
-            if tool:
+            if not tool:
+                continue
+
+            try:
                 output = tool.execute(query)
+
+                if output is None:
+                    continue
+
                 results.append(output)
 
-                self.task_manager.update_task(task["id"], step, output)
+                # update task safely
+                if task_id:
+                    self.task_manager.update_task(task_id, step, output)
 
-        # 4. Finish task
-        self.task_manager.complete_task(task["id"], results)
+            except Exception as e:
+                # don't crash entire loop
+                if task_id:
+                    self.task_manager.update_task(task_id, step, f"ERROR: {str(e)}")
 
-        return "\n".join(results)
+        # 4. COMPLETE TASK
+        if task_id:
+            self.task_manager.complete_task(task_id, results)
+
+        return "\n".join([r for r in results if r])
