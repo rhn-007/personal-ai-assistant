@@ -8,14 +8,11 @@ class Planner:
         t = query.lower()
 
         # EMAIL INTENT
-        if any(k in t for k in ["email", "inbox", "from:", "mail"]):
+        if any(k in t for k in ["email", "inbox", "mail", "gmail"]):
             return [{
                 "tool": "email",
                 "input": query
             }]
 
-        # DEFAULT SAFE PLAN (IMPORTANT FIX)
-        return [{
-            "tool": "chat",
-            "input": query
-        }]
+        # DEFAULT: no plan
+        return None
