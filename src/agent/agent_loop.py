@@ -40,7 +40,7 @@ class AgentLoop:
             tool_name = step.get("tool")
             query = step.get("input", user_input)
 
-            tool = self.tool_manager.get_tool(tool_name)
+            tool = self.tool_manager.get_tool_by_name(tool_name)
 
             if not tool:
                 continue
