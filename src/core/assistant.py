@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 + Tool System + Planner (Stage 4 Agent)
+Main Assistant Class - Memory 4.0 + Tool System + Planner + Agent Loop (Stage 5)
 """
 
 import os
@@ -10,57 +10,77 @@ from src.core.memory import MemoryManager
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
-from src.agent.task_manager import TaskManager
 
-# TOOL SYSTEM
+# ================= TOOL SYSTEM =================
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
 
-# PLANNER (Stage 4)
+# ================= PLANNER =================
 from src.planner.planner import Planner
+
+# ================= AGENT LOOP =================
+from src.agent.task_manager import TaskManager
+from src.agent.agent_loop import AgentLoop
 
 load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Agent with Memory + Tools + Planning Engine (Stage 4)"""
+    """AI Agent with Memory + Tools + Planner + Agent Loop (Stage 5)"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing Assistant (Stage 4 Agent)...")
+        self.logger.info("Initializing Assistant (Stage 5 Agent)...")
 
-        # ================= CORE =================
+        # =====================================================
+        # CORE SYSTEMS
+        # =====================================================
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
         self.llm = OllamaIntegration()
 
-        # ================= EMAIL =================
+        # =====================================================
+        # EMAIL SYSTEM
+        # =====================================================
         try:
             self.email = EmailIntegration()
         except Exception:
             self.email = None
 
-        # ================= PERSONALITY =================
+        # =====================================================
+        # PERSONALITY
+        # =====================================================
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-        # ================= TOOL SYSTEM =================
+        # =====================================================
+        # TOOL SYSTEM
+        # =====================================================
         self.tool_manager = ToolManager()
         self.tool_manager.register(EmailTool())
 
-        # ================= PLANNER =================
+        # =====================================================
+        # PLANNER (Stage 4)
+        # =====================================================
         self.planner = Planner(self.tool_manager)
 
-        self.logger.info("Assistant ready (Stage 4 Complete)")
-
-        # ================= STAGE 5 TASK ENGINE =================
+        # =====================================================
+        # AGENT LOOP (Stage 5)
+        # =====================================================
         self.task_manager = TaskManager()
+        self.agent_loop = AgentLoop(
+            tool_manager=self.tool_manager,
+            planner=self.planner,
+            task_manager=self.task_manager
+        )
+
+        self.logger.info("Assistant ready (Stage 5 Complete)")
 
     # =========================================================
-    # 🧠 MEMORY CONTEXT
+    # MEMORY CONTEXT
     # =========================================================
 
     def _get_memory_context(self, query: str):
@@ -83,7 +103,7 @@ class PersonalAssistant:
         return "\n".join(lines)
 
     # =========================================================
-    # 🧠 MEMORY LEARNING
+    # MEMORY LEARNING
     # =========================================================
 
     def _auto_memory_capture(self, text: str):
@@ -103,7 +123,7 @@ class PersonalAssistant:
                 self.memory.add_semantic_memory("interests", w)
 
     # =========================================================
-    # 🔧 TOOL EXECUTION LAYER (DIRECT FALLBACK)
+    # TOOL LAYER
     # =========================================================
 
     def _run_tools(self, user_input: str):
@@ -114,24 +134,17 @@ class PersonalAssistant:
                 return None
 
             self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
-
-            result = tool.execute(user_input)
-
-            return result if result else None
+            return tool.execute(user_input)
 
         except Exception as e:
             self.logger.error(f"Tool error: {e}")
             return None
 
     # =========================================================
-    # 🔥 STAGE 4 PLANNER ENGINE
+    # PLANNER LAYER
     # =========================================================
 
     def _run_planner(self, user_input: str):
-        """
-        Planner → multi-step execution system
-        """
-
         plan = self.planner.create_plan(user_input)
 
         if not plan:
@@ -140,51 +153,71 @@ class PersonalAssistant:
         results = []
 
         for step in plan:
-
             tool_name = step.get("tool")
             query = step.get("input", user_input)
 
             tool = self.tool_manager.get_tool(tool_name or query)
 
             if tool:
-                self.logger.info(f"Executing tool: {tool.__class__.__name__}")
                 output = tool.execute(query)
                 results.append(output)
 
         return "\n".join([r for r in results if r])
 
     # =========================================================
-    # 🚀 MAIN PIPELINE
+    # AGENT LOOP (HIGHEST LEVEL INTELLIGENCE)
+    # =========================================================
+
+    def _run_agent_loop(self, user_input: str):
+        try:
+            if not self.agent_loop:
+                return None
+
+            return self.agent_loop.run(user_input)
+
+        except Exception as e:
+            self.logger.error(f"Agent loop error: {e}")
+            return None
+
+    # =========================================================
+    # MAIN PIPELINE (FINAL STAGE 5 ARCHITECTURE)
     # =========================================================
 
     def process_input(self, user_input: str) -> str:
 
         try:
-            # 1. memory learning
+            # 1. MEMORY LEARNING
             self._auto_memory_capture(user_input)
 
             # =====================================================
-            # 2. DIRECT TOOL LAYER (FAST PATH)
+            # 2. AGENT LOOP (HIGHEST PRIORITY)
+            # =====================================================
+            agent_result = self._run_agent_loop(user_input)
+            if agent_result:
+                return agent_result
+
+            # =====================================================
+            # 3. DIRECT TOOL EXECUTION
             # =====================================================
             tool_result = self._run_tools(user_input)
             if tool_result:
                 return tool_result
 
             # =====================================================
-            # 3. PLANNER LAYER (SMART PATH)
+            # 4. PLANNER EXECUTION
             # =====================================================
             plan_result = self._run_planner(user_input)
             if plan_result:
                 return plan_result
 
             # =====================================================
-            # 4. EMAIL FALLBACK
+            # 5. EMAIL FALLBACK
             # =====================================================
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
             # =====================================================
-            # 5. CONTEXT BUILD
+            # 6. LLM CONTEXT BUILD
             # =====================================================
             context = self.conversation.get_context()
 
@@ -201,7 +234,7 @@ USER PERSONALITY:
             context.insert(1, {"role": "system", "content": personality_context})
 
             # =====================================================
-            # 6. LLM RESPONSE
+            # 7. LLM RESPONSE
             # =====================================================
             response = self.llm.generate_response(user_input, context)
 
@@ -214,7 +247,7 @@ USER PERSONALITY:
             return f"Error: {str(e)}"
 
     # =========================================================
-    # 📧 EMAIL SYSTEM
+    # EMAIL SYSTEM
     # =========================================================
 
     def _is_email_query(self, text: str):
@@ -234,7 +267,7 @@ USER PERSONALITY:
         return self.email.send_email(to, subject, body) if self.email else False
 
     # =========================================================
-    # 🧠 MEMORY CONTROL
+    # MEMORY CONTROL
     # =========================================================
 
     def remember(self, key, value):
@@ -251,7 +284,7 @@ USER PERSONALITY:
         }
 
     # =========================================================
-    # ⚙️ CONFIG
+    # DEBUG
     # =========================================================
 
     def show_config(self):
