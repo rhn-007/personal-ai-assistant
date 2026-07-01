@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 + Tool System + Planner (Stage 3)
+Main Assistant Class - Memory 4.0 + Tool System + Planner (Stage 4 Agent)
 """
 
 import os
@@ -15,103 +15,63 @@ from src.utils.logger import setup_logger
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
 
-# PLANNER (Stage 3)
+# PLANNER (Stage 4)
 from src.planner.planner import Planner
 
 load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Memory 4.0 + Tools + Planning Layer"""
+    """AI Agent with Memory + Tools + Planning Engine (Stage 4)"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Stage 3)...")
+        self.logger.info("Initializing Assistant (Stage 4 Agent)...")
 
-        # =========================================================
-        # CORE SYSTEMS
-        # =========================================================
+        # ================= CORE =================
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
         self.llm = OllamaIntegration()
 
-        # =========================================================
-        # EMAIL (OPTIONAL LEGACY)
-        # =========================================================
+        # ================= EMAIL =================
         try:
             self.email = EmailIntegration()
-        except Exception as e:
-            self.logger.warning(f"Email disabled: {e}")
+        except Exception:
             self.email = None
 
-        # =========================================================
-        # PERSONALITY CACHE
-        # =========================================================
+        # ================= PERSONALITY =================
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-        # =========================================================
-        # TOOL SYSTEM (Stage 2 foundation)
-        # =========================================================
+        # ================= TOOL SYSTEM =================
         self.tool_manager = ToolManager()
         self.tool_manager.register(EmailTool())
 
-        # =========================================================
-        # PLANNER (Stage 3)
-        # =========================================================
+        # ================= PLANNER =================
         self.planner = Planner(self.tool_manager)
 
-        self.logger.info(
-            f"Registered tools: {[t.__class__.__name__ for t in self.tool_manager.tools]}"
-        )
-
-    # =========================================================
-    # 🧠 PERSONALITY LEARNING
-    # =========================================================
-    def _update_personality(self, text: str):
-        t = text.lower()
-
-        if any(w in t for w in ["bro", "dude", "lol", "haha"]):
-            self.personality_cache["tone"] = "casual"
-
-        if any(w in t for w in ["please", "kindly", "thank you"]):
-            self.personality_cache["tone"] = "formal"
-
-        interests = [
-            "ai", "coding", "python", "games", "anime",
-            "robot", "music", "football", "science"
-        ]
-
-        for i in interests:
-            if i in t and i not in self.personality_cache["interests"]:
-                self.personality_cache["interests"].append(i)
-
-        if "short answer" in t:
-            self.personality_cache["communication_style"] = "concise"
-
-        if "detail" in t or "explain" in t:
-            self.personality_cache["communication_style"] = "detailed"
+        self.logger.info("Assistant ready (Stage 4 Complete)")
 
     # =========================================================
     # 🧠 MEMORY CONTEXT
     # =========================================================
-    def _get_memory_context(self, query: str):
 
+    def _get_memory_context(self, query: str):
         profile = self.memory.get_all_profile()
         semantic = self.memory.get_all_semantic()
 
-        lines = ["🧠 USER MEMORY CONTEXT"]
+        lines = ["🧠 USER MEMORY"]
 
         if profile:
-            lines.append("\nProfile Memory:")
+            lines.append("\nProfile:")
             for k, v in profile.items():
                 lines.append(f"- {k}: {v}")
 
         if semantic:
-            lines.append("\nSemantic Memory:")
+            lines.append("\nSemantic:")
             for cat, items in semantic.items():
                 values = ", ".join([i["value"] for i in items])
                 lines.append(f"- {cat}: {values}")
@@ -119,74 +79,109 @@ class PersonalAssistant:
         return "\n".join(lines)
 
     # =========================================================
-    # 🧠 AUTO MEMORY
+    # 🧠 MEMORY LEARNING
     # =========================================================
-    def _auto_memory_capture(self, text: str):
 
+    def _auto_memory_capture(self, text: str):
         t = text.lower()
 
         if "my name is" in t:
-            name = text.split("my name is")[-1].strip()
-            self.memory.set_profile("name", name)
+            self.memory.set_profile("name", text.split("my name is")[-1].strip())
 
         if "i like" in t:
-            value = text.split("i like")[-1].strip()
-            self.memory.add_semantic_memory("likes", value)
+            self.memory.add_semantic_memory("likes", text.split("i like")[-1].strip())
 
         if "i hate" in t:
-            value = text.split("i hate")[-1].strip()
-            self.memory.add_semantic_memory("dislikes", value)
+            self.memory.add_semantic_memory("dislikes", text.split("i hate")[-1].strip())
 
-        for w in ["ai", "coding", "anime", "music", "games", "python"]:
+        for w in ["ai", "coding", "anime", "music", "python"]:
             if w in t:
                 self.memory.add_semantic_memory("interests", w)
 
-        self._update_personality(text)
+    # =========================================================
+    # 🔧 TOOL EXECUTION LAYER (DIRECT FALLBACK)
+    # =========================================================
 
-    # =========================================================
-    # 🔧 TOOL EXECUTION LAYER
-    # =========================================================
     def _run_tools(self, user_input: str):
+        try:
+            tool = self.tool_manager.get_tool(user_input)
 
-        tool = self.tool_manager.get_tool(user_input)
-
-        if tool:
-            try:
-                self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
-                return tool.execute(user_input)
-            except Exception as e:
-                self.logger.error(f"Tool error: {e}")
+            if not tool:
                 return None
 
-        return None
+            self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
+
+            result = tool.execute(user_input)
+
+            return result if result else None
+
+        except Exception as e:
+            self.logger.error(f"Tool error: {e}")
+            return None
 
     # =========================================================
-    # 🚀 MAIN PIPELINE (Stage 3)
+    # 🔥 STAGE 4 PLANNER ENGINE
     # =========================================================
+
+    def _run_planner(self, user_input: str):
+        """
+        Planner → multi-step execution system
+        """
+
+        plan = self.planner.create_plan(user_input)
+
+        if not plan:
+            return None
+
+        results = []
+
+        for step in plan:
+
+            tool_name = step.get("tool")
+            query = step.get("input", user_input)
+
+            tool = self.tool_manager.get_tool(tool_name or query)
+
+            if tool:
+                self.logger.info(f"Executing tool: {tool.__class__.__name__}")
+                output = tool.execute(query)
+                results.append(output)
+
+        return "\n".join([r for r in results if r])
+
+    # =========================================================
+    # 🚀 MAIN PIPELINE
+    # =========================================================
+
     def process_input(self, user_input: str) -> str:
 
         try:
             # 1. memory learning
             self._auto_memory_capture(user_input)
 
-            # 2. planner FIRST (Stage 3 brain layer)
-            plan = self.planner.plan(user_input)
-
-            if plan and plan.get("use_tool"):
-                tool_result = self._run_tools(user_input)
-                if tool_result:
-                    return tool_result
-
-            # 3. fallback tool execution (direct)
+            # =====================================================
+            # 2. DIRECT TOOL LAYER (FAST PATH)
+            # =====================================================
             tool_result = self._run_tools(user_input)
             if tool_result:
                 return tool_result
 
-            # 4. email fallback
+            # =====================================================
+            # 3. PLANNER LAYER (SMART PATH)
+            # =====================================================
+            plan_result = self._run_planner(user_input)
+            if plan_result:
+                return plan_result
+
+            # =====================================================
+            # 4. EMAIL FALLBACK
+            # =====================================================
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 5. build context
+            # =====================================================
+            # 5. CONTEXT BUILD
+            # =====================================================
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
@@ -201,10 +196,11 @@ USER PERSONALITY:
             context.insert(0, {"role": "system", "content": memory_context})
             context.insert(1, {"role": "system", "content": personality_context})
 
-            # 6. LLM response
+            # =====================================================
+            # 6. LLM RESPONSE
+            # =====================================================
             response = self.llm.generate_response(user_input, context)
 
-            # 7. save conversation
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -216,42 +212,31 @@ USER PERSONALITY:
     # =========================================================
     # 📧 EMAIL SYSTEM
     # =========================================================
-    def _is_email_query(self, text: str) -> bool:
-        keywords = ["email", "mail", "gmail", "inbox", "unread", "send", "from:"]
-        return any(k in text.lower() for k in keywords)
 
-    def _handle_email_query(self, user_input: str) -> str:
+    def _is_email_query(self, text: str):
+        return any(k in text.lower() for k in ["email", "mail", "gmail", "inbox", "from:"])
 
-        try:
-            text = user_input.lower()
+    def _handle_email_query(self, user_input: str):
+        text = user_input.lower()
 
-            if "unread" in text:
-                return self.email.get_email_summary()
+        if "from:" in text:
+            sender = text.split("from:")[1].split()[0]
+            emails = self.email.get_emails_from(sender)
+            return "\n".join([e.get("subject", "No Subject") for e in emails])
 
-            if "from:" in text:
-                sender = text.split("from:")[1].split()[0]
-                emails = self.email.get_emails_from(sender)
+        return self.email.get_email_summary()
 
-                return "\n".join(
-                    f"- {e.get('subject','No Subject')}"
-                    for e in emails
-                )
-
-            return self.email.get_email_summary()
-
-        except Exception as e:
-            return f"Email error: {e}"
-
-    def send_email(self, to: str, subject: str, body: str):
+    def send_email(self, to, subject, body):
         return self.email.send_email(to, subject, body) if self.email else False
 
     # =========================================================
     # 🧠 MEMORY CONTROL
     # =========================================================
-    def remember(self, key: str, value: str):
+
+    def remember(self, key, value):
         self.memory.set_profile(key, value)
 
-    def recall(self, key: str):
+    def recall(self, key):
         return self.memory.get_profile(key)
 
     def show_memory(self):
@@ -264,19 +249,13 @@ USER PERSONALITY:
     # =========================================================
     # ⚙️ CONFIG
     # =========================================================
+
     def show_config(self):
-        print("\n⚙️ System Status")
+        print("\n⚙️ SYSTEM STATUS")
         print("=" * 30)
 
-        print("OpenAI:", bool(os.getenv("OPENAI_API_KEY")))
-        print("Ollama:", True)
+        print("Tools:", [t.__class__.__name__ for t in self.tool_manager.tools])
         print("Email:", bool(self.email))
-
-        print("\n🧠 MEMORY:")
-        print(self.memory.get_all_profile())
-
-        print("\n🧠 SEMANTIC:")
-        print(self.memory.get_all_semantic())
-
-        print("\n🔧 TOOLS:")
-        print([t.__class__.__name__ for t in self.tool_manager.tools])
+        print("Memory:", self.memory.get_all_profile())
+        print("Semantic:", self.memory.get_all_semantic())
+        print("Personality:", self.personality_cache)
