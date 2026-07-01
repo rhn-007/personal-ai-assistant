@@ -1,10 +1,10 @@
 """
-Email Integration - Gmail support (Fixed Stable Version)
+Email Integration - Gmail support (Fixed Stable + Type Safe Version)
 """
 
 import os
 import base64
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
@@ -18,7 +18,7 @@ logger = setup_logger(__name__)
 
 
 class EmailIntegration:
-    """Gmail integration for sending and reading emails"""
+    """Gmail integration for sending and reading emails (SAFE VERSION)"""
 
     SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
@@ -26,22 +26,24 @@ class EmailIntegration:
         self.service = None
         self._authenticate()
 
+    # =========================================================
+    # AUTH
+    # =========================================================
     def _authenticate(self):
-        """Authenticate with Gmail API"""
         try:
             creds = None
             credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
 
-            # 1. Service account (optional)
+            # Service account (optional)
             if credentials_file and os.path.exists(credentials_file):
                 creds = service_account.Credentials.from_service_account_file(
                     credentials_file,
                     scopes=self.SCOPES
                 )
 
-            # 2. OAuth flow (recommended)
             token_file = "token.json"
 
+            # OAuth flow
             if not creds:
                 if os.path.exists(token_file):
                     import pickle
@@ -68,7 +70,8 @@ class EmailIntegration:
                         pickle.dump(creds, token)
 
             self.service = googleapiclient.discovery.build(
-                "gmail", "v1", credentials=creds
+                "gmail", "v1",
+                credentials=creds
             )
 
             logger.info("Gmail authentication successful")
@@ -77,8 +80,9 @@ class EmailIntegration:
             logger.warning(f"Gmail authentication failed: {e}")
             self.service = None
 
-    # ---------------- EMAIL SEND ----------------
-
+    # =========================================================
+    # SEND EMAIL
+    # =========================================================
     def send_email(self, to: str, subject: str, body: str, html: bool = False) -> bool:
         if not self.service:
             return False
@@ -101,8 +105,9 @@ class EmailIntegration:
             logger.error(f"Error sending email: {e}")
             return False
 
-    # ---------------- FETCH EMAILS ----------------
-
+    # =========================================================
+    # CORE FETCH (SAFE OUTPUT ONLY DICTS OR LIST[DICT])
+    # =========================================================
     def get_emails(self, query: str = "is:unread", max_results: int = 5) -> List[Dict]:
         if not self.service:
             return []
@@ -115,16 +120,22 @@ class EmailIntegration:
             ).execute()
 
             messages = results.get("messages", [])
-            return [
-                self._get_email_content(msg["id"])
-                for msg in messages
-                if self._get_email_content(msg["id"])
-            ]
+            emails = []
+
+            for msg in messages:
+                email = self._get_email_content(msg.get("id"))
+                if isinstance(email, dict):
+                    emails.append(email)
+
+            return emails
 
         except Exception as e:
             logger.error(f"Error getting emails: {e}")
             return []
 
+    # =========================================================
+    # SAFE EMAIL PARSER
+    # =========================================================
     def _get_email_content(self, message_id: str) -> Optional[Dict]:
         try:
             msg = self.service.users().messages().get(
@@ -137,30 +148,46 @@ class EmailIntegration:
 
             return {
                 "id": message_id,
-                "subject": next((h["value"] for h in headers if h["name"] == "Subject"), "No Subject"),
-                "from": next((h["value"] for h in headers if h["name"] == "From"), "Unknown"),
-                "to": next((h["value"] for h in headers if h["name"] == "To"), ""),
-                "date": next((h["value"] for h in headers if h["name"] == "Date"), ""),
+                "subject": self._safe_header(headers, "Subject"),
+                "from": self._safe_header(headers, "From"),
+                "to": self._safe_header(headers, "To"),
+                "date": self._safe_header(headers, "Date"),
             }
 
         except Exception as e:
             logger.error(f"Error getting email content: {e}")
             return None
 
-    # ---------------- HELPERS ----------------
+    # =========================================================
+    # HEADER SAFETY
+    # =========================================================
+    def _safe_header(self, headers: List[Dict], name: str) -> str:
+        try:
+            return next((h["value"] for h in headers if h.get("name") == name), "")
+        except Exception:
+            return ""
 
+    # =========================================================
+    # HELPERS (CONSISTENT OUTPUT)
+    # =========================================================
     def get_unread_emails(self, max_results: int = 5) -> List[Dict]:
         return self.get_emails("is:unread", max_results)
 
     def get_emails_from(self, sender: str, max_results: int = 5) -> List[Dict]:
-        return self.get_emails(f"from:{sender}", max_results)
+        emails = self.get_emails(f"from:{sender}", max_results)
+        return emails if isinstance(emails, list) else []
 
     def get_email_summary(self) -> str:
         emails = self.get_unread_emails()
 
-        if not emails:
+        if not isinstance(emails, list) or len(emails) == 0:
             return "No unread emails found."
 
-        return "\n".join(
-            f"- {e['subject']} | {e['from']}" for e in emails
-        )
+        safe_lines = []
+        for e in emails:
+            if isinstance(e, dict):
+                safe_lines.append(
+                    f"- {e.get('subject','No Subject')} | {e.get('from','Unknown')}"
+                )
+
+        return "\n".join(safe_lines) if safe_lines else "No unread emails found."
