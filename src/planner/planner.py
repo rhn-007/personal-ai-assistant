@@ -11,3 +11,13 @@ class Planner:
             return tool.execute(user_input)
 
         return None
+
+    def create_task_plan(self, query: str):
+        """
+        Convert user request → multi-step tool plan
+        """
+    
+        return [
+            {"tool": "email", "input": query},
+            {"tool": "web_search", "input": query}
+        ]
