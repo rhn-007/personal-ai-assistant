@@ -207,7 +207,7 @@ class PersonalAssistant:
             # 4. PLANNER EXECUTION
             # =====================================================
             plan_result = self._run_planner(user_input)
-            if plan_result:
+            if plan_result and plan_result.strip():
                 return plan_result
 
             # =====================================================
