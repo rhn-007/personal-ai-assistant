@@ -33,7 +33,7 @@ class AgentLoop:
         task_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
 
         # 2. CREATE PLAN
-        plan = self.planner.create_plan(user_input)
+        plan = self.planner.plan(user_input)
 
         if not plan:
             return None
