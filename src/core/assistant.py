@@ -124,15 +124,22 @@ class PersonalAssistant:
     # TOOL LAYER
     # =========================================================
     def _run_tools(self, user_input: str):
-        try:
-            tool = self.tool_manager.get_tool(user_input)
-
-            if not tool:
+         try:
+            tool_result = self.tool_manager.execute(user_input)
+    
+            if not tool_result or not tool_result.get("handled"):
                 return None
-
-            self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
-            return tool.execute(user_input)
-
+    
+            data = tool_result.get("data")
+    
+            if isinstance(data, list):
+                return "\n".join(
+                    str(item.get("subject", item)) if isinstance(item, dict) else str(item)
+                    for item in data
+                )
+    
+            return str(data)
+    
         except Exception as e:
             self.logger.error(f"Tool error: {e}")
             return None
