@@ -10,6 +10,7 @@ from src.core.memory import MemoryManager
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
+from src.agent.task_manager import TaskManager
 
 # TOOL SYSTEM
 from src.tools.tool_manager import ToolManager
@@ -54,6 +55,9 @@ class PersonalAssistant:
         self.planner = Planner(self.tool_manager)
 
         self.logger.info("Assistant ready (Stage 4 Complete)")
+
+        # ================= STAGE 5 TASK ENGINE =================
+        self.task_manager = TaskManager()
 
     # =========================================================
     # 🧠 MEMORY CONTEXT
