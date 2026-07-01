@@ -1,130 +1,74 @@
-"""
-Tool Manager (FIXED - Unified Tool Response System)
-"""
-
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class ToolManager:
-    """Central manager for all assistant tools."""
+    """
+    Clean Tool Manager (Fixed Architecture)
+
+    - register tools
+    - get tool by name
+    - route tool by query
+    - execute safely
+    """
 
     def __init__(self):
         self.tools = {}
 
-    # ----------------------------------------------------
-    # Register Tools
-    # ----------------------------------------------------
+    # ---------------- REGISTER ----------------
 
     def register(self, tool):
         self.tools[tool.name] = tool
         logger.info(f"Registered tool: {tool.name}")
 
-    # ----------------------------------------------------
-    # Find Matching Tool
-    # ----------------------------------------------------
+    # ---------------- GET BY NAME ----------------
 
-    def get_tool(self, query):
+    def get_tool_by_name(self, name: str):
+        return self.tools.get(name)
+
+    # ---------------- ROUTE BY QUERY ----------------
+
+    def route(self, query: str):
         for tool in self.tools.values():
             try:
                 if tool.can_handle(query):
                     return tool
             except Exception as e:
-                logger.error(f"Tool check error '{tool.name}': {e}")
-
+                logger.error(f"Tool check error ({tool.name}): {e}")
         return None
 
-    # ----------------------------------------------------
-    # STANDARDIZED EXECUTION (FIXED)
-    # ----------------------------------------------------
+    # ---------------- EXECUTE TOOL ----------------
 
-    def execute(self, query):
-        """
-        ALWAYS returns:
+    def execute(self, query: str):
+        tool = self.route(query)
 
-        {
-            "handled": bool,
-            "tool": str | None,
-            "type": "text" | "list" | "dict" | "error" | "none",
-            "data": any
-        }
-        """
-
-        tool = self.get_tool(query)
-
-        if tool is None:
+        if not tool:
             return {
                 "handled": False,
                 "tool": None,
-                "type": "none",
-                "data": None
+                "result": None
             }
 
         try:
             logger.info(f"Executing tool: {tool.name}")
-
             result = tool.execute(query)
-
-            # -------------------------------
-            # NORMALIZATION LAYER (CRITICAL)
-            # -------------------------------
-
-            if isinstance(result, str):
-                normalized = {
-                    "handled": True,
-                    "tool": tool.name,
-                    "type": "text",
-                    "data": result
-                }
-
-            elif isinstance(result, list):
-                normalized = {
-                    "handled": True,
-                    "tool": tool.name,
-                    "type": "list",
-                    "data": result
-                }
-
-            elif isinstance(result, dict):
-                normalized = {
-                    "handled": True,
-                    "tool": tool.name,
-                    "type": result.get("type", "dict"),
-                    "data": result.get("data", result)
-                }
-
-            else:
-                normalized = {
-                    "handled": True,
-                    "tool": tool.name,
-                    "type": "text",
-                    "data": str(result)
-                }
-
-            return normalized
-
-        except Exception as e:
-            logger.error(f"Tool '{tool.name}' failed: {e}")
 
             return {
                 "handled": True,
                 "tool": tool.name,
-                "type": "error",
-                "data": str(e)
+                "result": result
             }
 
-    # ----------------------------------------------------
-    # Utility Functions
-    # ----------------------------------------------------
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            return {
+                "handled": True,
+                "tool": tool.name,
+                "result": f"Tool Error: {e}"
+            }
+
+    # ---------------- LIST ----------------
 
     def list_tools(self):
         return list(self.tools.keys())
-
-    def has_tool(self, name):
-        return name in self.tools
-
-    def unregister(self, name):
-        if name in self.tools:
-            del self.tools[name]
-            logger.info(f"Unregistered tool: {name}")
