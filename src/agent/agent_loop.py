@@ -5,13 +5,13 @@ from src.agent.task_manager import TaskManager
 
 class AgentLoop:
     """
-    Fixed Stage 5 Agent Loop
+    Stage 6 Agent Loop (App-Integration Ready)
 
-    Responsibilities:
-    - Execute structured plans
-    - Use ToolManager correctly
-    - Normalize tool outputs
-    - Keep execution safe
+    Supports:
+    - tool routing
+    - action-based execution
+    - structured planner output
+    - safe execution
     """
 
     def __init__(
@@ -26,7 +26,7 @@ class AgentLoop:
         self.task_manager = task_manager if task_manager else TaskManager()
 
     # =========================================================
-    # MAIN EXECUTION LOOP
+    # MAIN LOOP
     # =========================================================
 
     def run(self, user_input: str):
@@ -43,26 +43,35 @@ class AgentLoop:
 
         results = []
 
-        # 3. EXECUTE PLAN
+        # 3. EXECUTE PLAN STEPS
         for step in plan:
 
             if not isinstance(step, dict):
                 continue
 
             tool_name = step.get("tool")
+            action = step.get("action", "default")
             query = step.get("input", user_input)
 
             if not tool_name:
                 continue
 
-            # ✔ FIX: correct ToolManager API
+            # =================================================
+            # TOOL LOOKUP (UPDATED API)
+            # =================================================
             tool = self.tool_manager.get_tool_by_name(tool_name)
 
             if not tool:
                 continue
 
             try:
-                output = tool.execute(query)
+                # =================================================
+                # TOOL EXECUTION (ACTION-AWARE)
+                # =================================================
+                if hasattr(tool, "execute_action"):
+                    output = tool.execute_action(action, query)
+                else:
+                    output = tool.execute(query)
 
                 if output is None:
                     continue
@@ -70,14 +79,21 @@ class AgentLoop:
                 normalized_output = self._normalize(output)
                 results.append(normalized_output)
 
-                # update task safely
+                # =================================================
+                # TASK UPDATE
+                # =================================================
                 if task_id:
                     try:
-                        self.task_manager.update_task(task_id, step, normalized_output)
+                        self.task_manager.update_task(
+                            task_id,
+                            step,
+                            normalized_output
+                        )
                     except Exception:
                         pass
 
             except Exception as e:
+
                 if task_id:
                     try:
                         self.task_manager.update_task(
@@ -98,12 +114,12 @@ class AgentLoop:
         return "\n".join(results) if results else None
 
     # =========================================================
-    # OUTPUT NORMALIZATION (IMPORTANT FIX)
+    # NORMALIZATION LAYER
     # =========================================================
 
     def _normalize(self, output):
         """
-        Ensures all tool outputs become safe strings
+        Convert all tool outputs into safe strings
         """
 
         if output is None:
@@ -113,9 +129,11 @@ class AgentLoop:
             return output
 
         if isinstance(output, dict):
-            # try common fields first
+            # common patterns
             if "result" in output:
                 return str(output["result"])
+            if "message" in output:
+                return str(output["message"])
             return str(output)
 
         if isinstance(output, list):
