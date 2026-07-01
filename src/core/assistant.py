@@ -11,14 +11,10 @@ from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
 
-# ================= TOOL SYSTEM =================
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
 
-# ================= PLANNER =================
 from src.planner.planner import Planner
-
-# ================= AGENT LOOP =================
 from src.agent.task_manager import TaskManager
 from src.agent.agent_loop import AgentLoop
 
@@ -32,44 +28,32 @@ class PersonalAssistant:
         self.logger = setup_logger(__name__)
         self.logger.info("Initializing Assistant (Stage 5 Agent)...")
 
-        # =====================================================
         # CORE SYSTEMS
-        # =====================================================
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
         self.llm = OllamaIntegration()
 
-        # =====================================================
         # EMAIL SYSTEM
-        # =====================================================
         try:
             self.email = EmailIntegration()
         except Exception:
             self.email = None
 
-        # =====================================================
         # PERSONALITY
-        # =====================================================
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-        # =====================================================
         # TOOL SYSTEM
-        # =====================================================
         self.tool_manager = ToolManager()
         self.tool_manager.register(EmailTool())
 
-        # =====================================================
         # PLANNER
-        # =====================================================
         self.planner = Planner(self.tool_manager)
 
-        # =====================================================
         # AGENT LOOP
-        # =====================================================
         self.task_manager = TaskManager()
         self.agent_loop = AgentLoop(
             tool_manager=self.tool_manager,
@@ -96,7 +80,7 @@ class PersonalAssistant:
         if semantic:
             lines.append("\nSemantic:")
             for cat, items in semantic.items():
-                values = ", ".join([i["value"] for i in items])
+                values = ", ".join([str(i) for i in items])
                 lines.append(f"- {cat}: {values}")
 
         return "\n".join(lines)
@@ -121,25 +105,17 @@ class PersonalAssistant:
                 self.memory.add_semantic_memory("interests", w)
 
     # =========================================================
-    # TOOL LAYER
+    # TOOL LAYER (FIXED)
     # =========================================================
     def _run_tools(self, user_input: str):
-         try:
+        try:
             tool_result = self.tool_manager.execute(user_input)
-    
+
             if not tool_result or not tool_result.get("handled"):
                 return None
-    
-            data = tool_result.get("data")
-    
-            if isinstance(data, list):
-                return "\n".join(
-                    str(item.get("subject", item)) if isinstance(item, dict) else str(item)
-                    for item in data
-                )
-    
-            return str(data)
-    
+
+            return tool_result.get("result")
+
         except Exception as e:
             self.logger.error(f"Tool error: {e}")
             return None
@@ -148,7 +124,6 @@ class PersonalAssistant:
     # PLANNER LAYER
     # =========================================================
     def _run_planner(self, user_input: str):
-
         try:
             plan = self.planner.create_plan(user_input)
 
@@ -158,11 +133,10 @@ class PersonalAssistant:
             results = []
 
             for step in plan:
-
                 tool_name = step.get("tool")
                 query = step.get("input", user_input)
 
-                tool = self.tool_manager.get_tool(tool_name)
+                tool = self.tool_manager.get_tool(query)
 
                 if not tool:
                     continue
@@ -170,7 +144,7 @@ class PersonalAssistant:
                 output = tool.execute(query)
 
                 if output:
-                    results.append(output)
+                    results.append(str(output))
 
             return "\n".join(results) if results else None
 
@@ -198,29 +172,23 @@ class PersonalAssistant:
     def process_input(self, user_input: str) -> str:
 
         try:
-            # 1. MEMORY
             self._auto_memory_capture(user_input)
 
-            # 2. AGENT LOOP
             agent_result = self._run_agent_loop(user_input)
             if agent_result:
                 return agent_result
 
-            # 3. DIRECT TOOL
             tool_result = self._run_tools(user_input)
             if tool_result:
                 return tool_result
 
-            # 4. PLANNER
             plan_result = self._run_planner(user_input)
             if plan_result:
                 return plan_result
 
-            # 5. EMAIL
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # 6. LLM
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
@@ -287,7 +255,7 @@ USER PERSONALITY:
         print("\n⚙️ SYSTEM STATUS")
         print("=" * 30)
 
-        print("Tools:", [t.__class__.__name__ for t in self.tool_manager.tools])
+        print("Tools:", list(self.tool_manager.tools.keys()))
         print("Email:", bool(self.email))
         print("Memory:", self.memory.get_all_profile())
         print("Semantic:", self.memory.get_all_semantic())
