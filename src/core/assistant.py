@@ -156,11 +156,15 @@ class PersonalAssistant:
             tool_name = step.get("tool")
             query = step.get("input", user_input)
 
-            tool = self.tool_manager.get_tool(tool_name or query)
+            tool = self.tool_manager.get_tool(tool_name)
+
+            if not tool:
+                continue
 
             if tool:
                 output = tool.execute(query)
-                results.append(output)
+                if output:
+                    results.append(output)
 
         return "\n".join([r for r in results if r])
 
