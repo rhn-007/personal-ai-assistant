@@ -1,6 +1,5 @@
 """
-Tool Manager
-Handles registration and execution of all assistant tools.
+Tool Manager (FIXED - Unified Tool Response System)
 """
 
 from src.utils.logger import setup_logger
@@ -19,12 +18,6 @@ class ToolManager:
     # ----------------------------------------------------
 
     def register(self, tool):
-        """
-        Register a new tool.
-
-        Example:
-            tool_manager.register(EmailTool())
-        """
         self.tools[tool.name] = tool
         logger.info(f"Registered tool: {tool.name}")
 
@@ -33,34 +26,29 @@ class ToolManager:
     # ----------------------------------------------------
 
     def get_tool(self, query):
-        """
-        Returns the first tool capable of handling the query.
-        """
-
         for tool in self.tools.values():
             try:
                 if tool.can_handle(query):
                     return tool
             except Exception as e:
-                logger.error(f"Error checking tool '{tool.name}': {e}")
+                logger.error(f"Tool check error '{tool.name}': {e}")
 
         return None
 
     # ----------------------------------------------------
-    # Execute Tool
+    # STANDARDIZED EXECUTION (FIXED)
     # ----------------------------------------------------
 
     def execute(self, query):
         """
-        Execute the appropriate tool.
+        ALWAYS returns:
 
-        Returns:
-            dict:
-            {
-                "handled": True/False,
-                "tool": "email",
-                "result": ...
-            }
+        {
+            "handled": bool,
+            "tool": str | None,
+            "type": "text" | "list" | "dict" | "error" | "none",
+            "data": any
+        }
         """
 
         tool = self.get_tool(query)
@@ -69,7 +57,8 @@ class ToolManager:
             return {
                 "handled": False,
                 "tool": None,
-                "result": None
+                "type": "none",
+                "data": None
             }
 
         try:
@@ -77,11 +66,43 @@ class ToolManager:
 
             result = tool.execute(query)
 
-            return {
-                "handled": True,
-                "tool": tool.name,
-                "result": result
-            }
+            # -------------------------------
+            # NORMALIZATION LAYER (CRITICAL)
+            # -------------------------------
+
+            if isinstance(result, str):
+                normalized = {
+                    "handled": True,
+                    "tool": tool.name,
+                    "type": "text",
+                    "data": result
+                }
+
+            elif isinstance(result, list):
+                normalized = {
+                    "handled": True,
+                    "tool": tool.name,
+                    "type": "list",
+                    "data": result
+                }
+
+            elif isinstance(result, dict):
+                normalized = {
+                    "handled": True,
+                    "tool": tool.name,
+                    "type": result.get("type", "dict"),
+                    "data": result.get("data", result)
+                }
+
+            else:
+                normalized = {
+                    "handled": True,
+                    "tool": tool.name,
+                    "type": "text",
+                    "data": str(result)
+                }
+
+            return normalized
 
         except Exception as e:
             logger.error(f"Tool '{tool.name}' failed: {e}")
@@ -89,7 +110,8 @@ class ToolManager:
             return {
                 "handled": True,
                 "tool": tool.name,
-                "result": f"Tool Error: {e}"
+                "type": "error",
+                "data": str(e)
             }
 
     # ----------------------------------------------------
@@ -97,15 +119,12 @@ class ToolManager:
     # ----------------------------------------------------
 
     def list_tools(self):
-        """Return a list of registered tool names."""
         return list(self.tools.keys())
 
     def has_tool(self, name):
-        """Check if a tool is registered."""
         return name in self.tools
 
     def unregister(self, name):
-        """Remove a registered tool."""
         if name in self.tools:
             del self.tools[name]
             logger.info(f"Unregistered tool: {name}")
