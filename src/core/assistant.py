@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 + Tool System (Stage 2 Improved)
+Main Assistant Class - Memory 4.0 + Tool System + Planner (Stage 3)
 """
 
 import os
@@ -10,21 +10,23 @@ from src.core.memory import MemoryManager
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
-from src.planner.planner import Planner
 
-# 🧠 TOOL SYSTEM
+# TOOL SYSTEM
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
+
+# PLANNER (Stage 3)
+from src.planner.planner import Planner
 
 load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Assistant with Memory 4.0 + Safe Tool Execution Layer"""
+    """AI Assistant with Memory 4.0 + Tools + Planning Layer"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing PersonalAssistant (Stage 2 Tools)...")
+        self.logger.info("Initializing PersonalAssistant (Stage 3)...")
 
         # =========================================================
         # CORE SYSTEMS
@@ -34,7 +36,7 @@ class PersonalAssistant:
         self.llm = OllamaIntegration()
 
         # =========================================================
-        # EMAIL INTEGRATION (FALLBACK LEGACY)
+        # EMAIL (OPTIONAL LEGACY)
         # =========================================================
         try:
             self.email = EmailIntegration()
@@ -52,14 +54,19 @@ class PersonalAssistant:
         }
 
         # =========================================================
-        # TOOL SYSTEM (STAGE 2 IMPROVED)
+        # TOOL SYSTEM (Stage 2 foundation)
         # =========================================================
         self.tool_manager = ToolManager()
-
-        # register tools
         self.tool_manager.register(EmailTool())
 
-        self.logger.info(f"Registered tools: {len(self.tool_manager.tools)}")
+        # =========================================================
+        # PLANNER (Stage 3)
+        # =========================================================
+        self.planner = Planner(self.tool_manager)
+
+        self.logger.info(
+            f"Registered tools: {[t.__class__.__name__ for t in self.tool_manager.tools]}"
+        )
 
     # =========================================================
     # 🧠 PERSONALITY LEARNING
@@ -137,32 +144,24 @@ class PersonalAssistant:
         self._update_personality(text)
 
     # =========================================================
-    # 🔧 TOOL EXECUTION LAYER (STAGE 2 FIXED)
+    # 🔧 TOOL EXECUTION LAYER
     # =========================================================
     def _run_tools(self, user_input: str):
 
-        try:
-            tool = self.tool_manager.get_tool(user_input)
+        tool = self.tool_manager.get_tool(user_input)
 
-            if not tool:
+        if tool:
+            try:
+                self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
+                return tool.execute(user_input)
+            except Exception as e:
+                self.logger.error(f"Tool error: {e}")
                 return None
 
-            self.logger.info(f"Tool triggered: {tool.__class__.__name__}")
-
-            result = tool.execute(user_input)
-
-            # prevent empty crashes
-            if result is None:
-                return None
-
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Tool execution error: {e}")
-            return None
+        return None
 
     # =========================================================
-    # 🚀 MAIN PIPELINE
+    # 🚀 MAIN PIPELINE (Stage 3)
     # =========================================================
     def process_input(self, user_input: str) -> str:
 
@@ -170,23 +169,24 @@ class PersonalAssistant:
             # 1. memory learning
             self._auto_memory_capture(user_input)
 
-            # =====================================================
-            # TOOL LAYER (STAGE 2)
-            # =====================================================
-            tool_result = self._run_tools(user_input)
+            # 2. planner FIRST (Stage 3 brain layer)
+            plan = self.planner.plan(user_input)
 
+            if plan and plan.get("use_tool"):
+                tool_result = self._run_tools(user_input)
+                if tool_result:
+                    return tool_result
+
+            # 3. fallback tool execution (direct)
+            tool_result = self._run_tools(user_input)
             if tool_result:
                 return tool_result
 
-            # =====================================================
-            # EMAIL LEGACY FALLBACK
-            # =====================================================
+            # 4. email fallback
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
-            # =====================================================
-            # LLM CONTEXT BUILD
-            # =====================================================
+            # 5. build context
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
@@ -201,11 +201,10 @@ USER PERSONALITY:
             context.insert(0, {"role": "system", "content": memory_context})
             context.insert(1, {"role": "system", "content": personality_context})
 
-            # =====================================================
-            # LLM RESPONSE
-            # =====================================================
+            # 6. LLM response
             response = self.llm.generate_response(user_input, context)
 
+            # 7. save conversation
             self.conversation.add_exchange(user_input, response)
 
             return response
@@ -215,7 +214,7 @@ USER PERSONALITY:
             return f"Error: {str(e)}"
 
     # =========================================================
-    # 📧 EMAIL (LEGACY)
+    # 📧 EMAIL SYSTEM
     # =========================================================
     def _is_email_query(self, text: str) -> bool:
         keywords = ["email", "mail", "gmail", "inbox", "unread", "send", "from:"]
