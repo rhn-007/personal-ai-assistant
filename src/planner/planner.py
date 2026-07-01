@@ -4,9 +4,6 @@ class Planner:
         self.tool_manager = tool_manager
 
     def execute(self, user_input: str):
-        """
-        Direct execution (fast path fallback)
-        """
         tool = self.tool_manager.get_tool(user_input)
 
         if tool:
@@ -14,26 +11,21 @@ class Planner:
 
         return None
 
-    # ✅ FIX: standard method name expected by AgentLoop
+    # ✅ STANDARD METHOD (THIS IS WHAT EVERYTHING MUST USE)
     def create_plan(self, query: str):
-        """
-        Convert user request → multi-step execution plan
-        """
-
         query = query.lower()
 
         plan = []
 
-        # email-related planning
         if any(k in query for k in ["email", "mail", "inbox"]):
             plan.append({
                 "tool": "email",
                 "input": query
             })
 
-        # generic fallback tool attempt
+        # fallback step
         plan.append({
-            "tool": "auto",
+            "tool": "email",
             "input": query
         })
 
