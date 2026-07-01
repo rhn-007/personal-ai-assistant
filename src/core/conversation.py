@@ -1,94 +1,203 @@
 """
-Conversation Management - Handles conversation flow and context (Ollama-ready)
+Email Integration - Gmail support (Stable + Import-safe version)
 """
 
-from typing import List, Dict
-from datetime import datetime
-import sys
 import os
+import base64
+import pickle
+from typing import List, Dict, Optional
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from email.mime.text import MIMEText
 
-from core.memory import MemoryManager
-from utils.logger import setup_logger
+# ---------------- SAFE LOGGER (prevents import crashes) ----------------
+try:
+    from src.utils.logger import setup_logger
+    logger = setup_logger(__name__)
+except Exception:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-logger = setup_logger(__name__)
+# ---------------- GOOGLE IMPORTS ----------------
+from google.auth.transport.requests import Request
+from google.oauth2 import service_account
+from google_auth_oauthlib.flow import InstalledAppFlow
+import googleapiclient.discovery
 
 
-class ConversationManager:
-    """Manages conversation flow and context"""
+class EmailIntegration:
+    """
+    Gmail integration for:
+    - Reading emails
+    - Fetching unread messages
+    - Sending emails
+    """
 
-    def __init__(self, memory_manager: MemoryManager):
-        """
-        Initialize conversation manager
-        """
-        self.memory_manager = memory_manager
+    SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
-        # Context storage for LLM
-        self.current_context: List[Dict[str, str]] = []
+    def __init__(self):
+        self.service = None
+        self._authenticate()
 
-        # prevents overflow in long chats
-        self.max_context_messages = 10
+    # =========================================================
+    # AUTHENTICATION
+    # =========================================================
+    def _authenticate(self):
+        """Authenticate Gmail safely (handles all edge cases)"""
 
-        # system prompt (important for Ollama behavior)
-        self.system_prompt = {
-            "role": "system",
-            "content": "You are a helpful, intelligent personal AI assistant. Be concise, accurate, and helpful."
-        }
+        try:
+            creds = None
 
-    # ---------------- ADD EXCHANGE ----------------
+            credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
 
-    def add_exchange(self, user_message: str, assistant_response: str) -> None:
-        """Save chat exchange"""
+            # 1. SERVICE ACCOUNT (optional)
+            if credentials_file and os.path.exists(credentials_file):
+                creds = service_account.Credentials.from_service_account_file(
+                    credentials_file,
+                    scopes=self.SCOPES
+                )
 
-        exchange = {
-            "timestamp": datetime.now().isoformat(),
-            "user": user_message,
-            "assistant": assistant_response
-        }
+            token_file = "token.json"
 
-        self.memory_manager.save_exchange(exchange)
+            # 2. OAUTH TOKEN
+            if not creds:
+                if os.path.exists(token_file):
+                    with open(token_file, "rb") as token:
+                        creds = pickle.load(token)
 
-        self.current_context.append({"role": "user", "content": user_message})
-        self.current_context.append({"role": "assistant", "content": assistant_response})
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
 
-        self._trim_context()
+                elif not creds:
+                    if not os.path.exists("credentials.json"):
+                        raise FileNotFoundError(
+                            "Missing credentials.json (Google OAuth required)"
+                        )
 
-    # ---------------- CONTEXT ----------------
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        "credentials.json",
+                        self.SCOPES
+                    )
 
-    def get_context(self) -> List[Dict[str, str]]:
-        """
-        Return full context for Ollama/OpenAI
-        Always includes system prompt at top
-        """
+                    creds = flow.run_local_server(port=0)
 
-        return [self.system_prompt] + self.current_context
+                # Save token
+                with open(token_file, "wb") as token:
+                    pickle.dump(creds, token)
 
-    def _trim_context(self):
-        """Keep context size controlled"""
-        max_items = self.max_context_messages * 2
+            # Build Gmail service
+            self.service = googleapiclient.discovery.build(
+                "gmail",
+                "v1",
+                credentials=creds
+            )
 
-        if len(self.current_context) > max_items:
-            self.current_context = self.current_context[-max_items:]
+            logger.info("Gmail authentication successful")
 
-    # ---------------- HISTORY ----------------
+        except Exception as e:
+            logger.warning(f"Gmail authentication failed: {e}")
+            self.service = None
 
-    def get_history(self, limit: int = 10) -> List[Dict]:
-        return self.memory_manager.get_history(limit)
+    # =========================================================
+    # SEND EMAIL
+    # =========================================================
+    def send_email(self, to: str, subject: str, body: str, html: bool = False) -> bool:
+        """Send email via Gmail API"""
 
-    def clear_history(self) -> None:
-        self.memory_manager.clear_history()
-        self.current_context = []
-        logger.info("Conversation history cleared")
+        if not self.service:
+            return False
 
-    # ---------------- SYSTEM PROMPT ----------------
+        try:
+            message = MIMEText(body, "html" if html else "plain")
+            message["to"] = to
+            message["subject"] = subject
 
-    def add_system_context(self, context: str) -> None:
-        """
-        Dynamically change assistant behavior
-        """
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
-        self.system_prompt = {
-            "role": "system",
-            "content": context
-        }
+            self.service.users().messages().send(
+                userId="me",
+                body={"raw": raw}
+            ).execute()
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Send email error: {e}")
+            return False
+
+    # =========================================================
+    # FETCH EMAILS
+    # =========================================================
+    def get_emails(self, query: str = "is:unread", max_results: int = 5) -> List[Dict]:
+        """Generic email fetch"""
+
+        if not self.service:
+            return []
+
+        try:
+            results = self.service.users().messages().list(
+                userId="me",
+                q=query,
+                maxResults=max_results
+            ).execute()
+
+            messages = results.get("messages", [])
+
+            emails = []
+            for msg in messages:
+                email_data = self._get_email_content(msg["id"])
+                if email_data:
+                    emails.append(email_data)
+
+            return emails
+
+        except Exception as e:
+            logger.error(f"Get emails error: {e}")
+            return []
+
+    def _get_email_content(self, message_id: str) -> Optional[Dict]:
+        """Fetch single email details"""
+
+        try:
+            msg = self.service.users().messages().get(
+                userId="me",
+                id=message_id,
+                format="full"
+            ).execute()
+
+            headers = msg.get("payload", {}).get("headers", [])
+
+            def get_header(name):
+                return next((h["value"] for h in headers if h["name"] == name), "")
+
+            return {
+                "id": message_id,
+                "subject": get_header("Subject") or "No Subject",
+                "from": get_header("From") or "Unknown",
+                "to": get_header("To"),
+                "date": get_header("Date")
+            }
+
+        except Exception as e:
+            logger.error(f"Email parse error: {e}")
+            return None
+
+    # =========================================================
+    # HELPERS
+    # =========================================================
+    def get_unread_emails(self, max_results: int = 5) -> List[Dict]:
+        return self.get_emails("is:unread", max_results)
+
+    def get_emails_from(self, sender: str, max_results: int = 5) -> List[Dict]:
+        return self.get_emails(f"from:{sender}", max_results)
+
+    def get_email_summary(self) -> str:
+        emails = self.get_unread_emails()
+
+        if not emails:
+            return "No unread emails found."
+
+        return "\n".join(
+            f"- {e.get('subject','No Subject')} | {e.get('from','Unknown')}"
+            for e in emails
+        )
