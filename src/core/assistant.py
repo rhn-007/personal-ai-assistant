@@ -47,12 +47,12 @@ class PersonalAssistant:
             "interests": [],
         }
 
-        #SPOTIFY
-        self.tool_manager.register(SpotifyTool())
-
-        # TOOL SYSTEM
+               # TOOL SYSTEM
         self.tool_manager = ToolManager()
         self.tool_manager.register(EmailTool())
+
+         #SPOTIFY
+        self.tool_manager.register(SpotifyTool())
 
         # PLANNER
         self.planner = Planner(self.tool_manager)
@@ -108,54 +108,7 @@ class PersonalAssistant:
             if w in t:
                 self.memory.add_semantic_memory("interests", w)
 
-    # =========================================================
-    # TOOL LAYER (FIXED)
-    # =========================================================
-    def _run_tools(self, user_input: str):
-        try:
-            tool_result = self.tool_manager.execute(user_input)
-
-            if not tool_result or not tool_result.get("handled"):
-                return None
-
-            return tool_result.get("result")
-
-        except Exception as e:
-            self.logger.error(f"Tool error: {e}")
-            return None
-
-    # =========================================================
-    # PLANNER LAYER
-    # =========================================================
-    def _run_planner(self, user_input: str):
-        try:
-            plan = self.planner.create_plan(user_input)
-
-            if not plan:
-                return None
-
-            results = []
-
-            for step in plan:
-                tool_name = step.get("tool")
-                query = step.get("input", user_input)
-
-                tool = self.tool_manager.get_tool(query)
-
-                if not tool:
-                    continue
-
-                output = tool.execute(query)
-
-                if output:
-                    results.append(str(output))
-
-            return "\n".join(results) if results else None
-
-        except Exception as e:
-            self.logger.error(f"Planner error: {e}")
-            return None
-
+   
     # =========================================================
     # AGENT LOOP
     # =========================================================
