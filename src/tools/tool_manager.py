@@ -70,6 +70,36 @@ class ToolManager:
                 "result": f"Tool Error: {e}"
             }
 
+        def execute_by_name(self, name, action, query):
+            tool = self.get_tool_by_name(name)
+        
+            if not tool:
+                return {
+                    "handled": False,
+                    "tool": name,
+                    "result": None
+                }
+        
+            try:
+                # ACTION-AWARE EXECUTION
+                if hasattr(tool, "execute_action"):
+                    result = tool.execute_action(action, query)
+                else:
+                    result = tool.execute(query)
+        
+                return {
+                    "handled": True,
+                    "tool": name,
+                    "result": result
+                }
+        
+            except Exception as e:
+                return {
+                    "handled": True,
+                    "tool": name,
+                    "result": f"Tool Error: {e}"
+                }
+
     # ---------------- LIST ----------------
     def list_tools(self):
         return list(self.tools.keys())
