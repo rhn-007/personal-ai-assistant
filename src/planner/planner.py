@@ -1,6 +1,6 @@
 class Planner:
     """
-    Stage 6 Planner (Upgraded)
+    Stage 6 Planner (Upgraded - Stable Agent Version)
 
     Converts natural language → structured tool execution plan
     """
@@ -8,6 +8,9 @@ class Planner:
     def __init__(self, tool_manager):
         self.tool_manager = tool_manager
 
+    # =========================================================
+    # MAIN FUNCTION
+    # =========================================================
     def create_plan(self, query: str):
 
         if not query or not isinstance(query, str):
@@ -17,32 +20,25 @@ class Planner:
         plan = []
 
         # =====================================================
-        # EMAIL INTENT
+        # EMAIL INTENT (HIGH PRIORITY)
         # =====================================================
         if any(k in t for k in ["email", "mail", "gmail", "inbox"]):
 
-            # SEND EMAIL
             if any(k in t for k in ["send", "compose", "write"]):
                 plan.append({
                     "tool": "email",
-                    "action": "send",
-                    "input": {
-                        "raw": query
-                    }
+                    "action": "send_email",
+                    "input": {"raw": query}
                 })
 
-            # FROM FILTER
             elif "from:" in t:
                 sender = t.split("from:")[-1].split()[0].strip()
                 plan.append({
                     "tool": "email",
                     "action": "get_from",
-                    "input": {
-                        "sender": sender
-                    }
+                    "input": {"sender": sender}
                 })
 
-            # DEFAULT → unread
             else:
                 plan.append({
                     "tool": "email",
@@ -51,9 +47,37 @@ class Planner:
                 })
 
         # =====================================================
+        # CALENDAR INTENT (IMPORTANT PRODUCTIVITY LAYER)
+        # =====================================================
+        elif any(k in t for k in ["calendar", "schedule", "meeting", "reminder", "event"]):
+
+            if any(k in t for k in ["delete", "remove"]):
+                plan.append({
+                    "tool": "calendar",
+                    "action": "delete",
+                    "input": {"query": query}
+                })
+
+            elif any(k in t for k in ["show", "view", "list"]):
+                plan.append({
+                    "tool": "calendar",
+                    "action": "view",
+                    "input": {}
+                })
+
+            else:
+                plan.append({
+                    "tool": "calendar",
+                    "action": "create",
+                    "input": {"query": query}
+                })
+
+        # =====================================================
         # SPOTIFY / MUSIC INTENT
         # =====================================================
-        elif any(k in t for k in ["spotify", "play", "song", "music", "audio"]):
+        elif any(k in t for k in [
+            "spotify", "play", "song", "music", "audio", "listen"
+        ]):
 
             plan.append({
                 "tool": "spotify",
@@ -64,22 +88,11 @@ class Planner:
             })
 
         # =====================================================
-        # CALENDAR INTENT
-        # =====================================================
-        elif any(k in t for k in ["calendar", "schedule", "meeting", "reminder", "event"]):
-
-            plan.append({
-                "tool": "calendar",
-                "action": "create",
-                "input": {
-                    "query": query
-                }
-            })
-
-        # =====================================================
         # SYSTEM / DEVICE CONTROL
         # =====================================================
-        elif any(k in t for k in ["open", "file", "folder", "system", "launch"]):
+        elif any(k in t for k in [
+            "open", "file", "folder", "system", "launch", "run"
+        ]):
 
             plan.append({
                 "tool": "system",
@@ -90,7 +103,7 @@ class Planner:
             })
 
         # =====================================================
-        # FALLBACK (IMPORTANT FOR AI FLOW)
+        # FALLBACK (LLM HANDLING - IMPORTANT)
         # =====================================================
         else:
             plan.append({
