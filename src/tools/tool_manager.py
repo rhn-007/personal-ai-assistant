@@ -5,141 +5,68 @@ logger = setup_logger(__name__)
 
 class ToolManager:
     """
-    Stage 6 Tool Manager (Production-ready)
+    Unified Tool Manager (FINAL FIXED VERSION)
 
-    Features:
-    - tool registry
-    - direct name lookup
-    - query routing
-    - structured execution
-    - safe failure handling
+    - register tools
+    - get tool by name
+    - route query → tool
+    - safe execution
     """
 
     def __init__(self):
         self.tools = {}
 
-    # =========================================================
-    # REGISTER TOOL
-    # =========================================================
-
+    # ---------------- REGISTER ----------------
     def register(self, tool):
         self.tools[tool.name] = tool
         logger.info(f"Registered tool: {tool.name}")
 
-    # =========================================================
-    # GET TOOL BY NAME (USED BY AGENT LOOP)
-    # =========================================================
-
-    def get_tool_by_name(self, name: str):
+    # ---------------- GET TOOL (FIXED API) ----------------
+    def get_tool(self, name: str):
+        """
+        FIX: restores compatibility with AgentLoop + Planner
+        """
         return self.tools.get(name)
 
-    # =========================================================
-    # ROUTE TOOL BY QUERY (USED BY LEGACY / FALLBACK)
-    # =========================================================
-
+    # ---------------- ROUTER ----------------
     def route(self, query: str):
         for tool in self.tools.values():
             try:
                 if hasattr(tool, "can_handle") and tool.can_handle(query):
                     return tool
             except Exception as e:
-                logger.error(f"Tool routing error ({tool.name}): {e}")
-
+                logger.error(f"Tool check error ({tool.name}): {e}")
         return None
 
-    # =========================================================
-    # EXECUTE (LEGACY + FALLBACK SUPPORT)
-    # =========================================================
+    # ---------------- EXECUTE (SAFE LAYER) ----------------
+    def execute(self, query: str):
+        tool = self.route(query)
 
-    def execute(self, payload):
-        """
-        Unified execution layer
-
-        Supports:
-        - string queries (legacy)
-        - structured payloads (new system)
-        """
-
-        try:
-            # -----------------------------------------
-            # CASE 1: legacy string input
-            # -----------------------------------------
-            if isinstance(payload, str):
-                tool = self.route(payload)
-
-                if not tool:
-                    return {
-                        "handled": False,
-                        "tool": None,
-                        "result": None
-                    }
-
-                result = tool.execute(payload)
-
-                return {
-                    "handled": True,
-                    "tool": tool.name,
-                    "result": result
-                }
-
-            # -----------------------------------------
-            # CASE 2: structured execution
-            # -----------------------------------------
-            if isinstance(payload, dict):
-
-                tool_name = payload.get("tool")
-                action = payload.get("action")
-                input_data = payload.get("input", {})
-
-                tool = self.get_tool_by_name(tool_name)
-
-                if not tool:
-                    return {
-                        "handled": False,
-                        "tool": tool_name,
-                        "result": "Tool not found"
-                    }
-
-                logger.info(f"Executing {tool_name}:{action}")
-
-                # ACTION-FIRST EXECUTION
-                if hasattr(tool, "execute_action"):
-                    result = tool.execute_action(action, input_data)
-                else:
-                    result = tool.execute(input_data)
-
-                return {
-                    "handled": True,
-                    "tool": tool_name,
-                    "result": result
-                }
-
+        if not tool:
             return {
                 "handled": False,
                 "tool": None,
-                "result": "Invalid payload"
+                "result": None
             }
 
-        except Exception as e:
-            logger.error(f"Tool execution error: {e}")
+        try:
+            logger.info(f"Executing tool: {tool.name}")
+            result = tool.execute(query)
 
             return {
                 "handled": True,
-                "tool": None,
-                "result": f"Tool Error: {str(e)}"
+                "tool": tool.name,
+                "result": result
             }
 
-    # =========================================================
-    # LIST TOOLS
-    # =========================================================
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            return {
+                "handled": True,
+                "tool": tool.name,
+                "result": f"Tool Error: {e}"
+            }
 
+    # ---------------- LIST ----------------
     def list_tools(self):
         return list(self.tools.keys())
-
-    # =========================================================
-    # CHECK TOOL
-    # =========================================================
-
-    def has_tool(self, name: str):
-        return name in self.tools
-    
