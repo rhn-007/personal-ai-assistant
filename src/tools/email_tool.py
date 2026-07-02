@@ -48,49 +48,45 @@ class EmailTool:
     # ----------------------------------------------------
 
     def execute(self, query: str):
-        """
-        Executes email-related actions based on intent.
-        """
-
         if not self.email:
-            return "Email system is not available."
-
+            return {"success": False, "message": "Email system not available"}
+    
         q = query.lower()
-
-        try:
-            # -----------------------------
-            # 1. Check unread / inbox
-            # -----------------------------
-            if "unread" in q or "check" in q or "inbox" in q:
-                return self.email.get_email_summary()
-
-            # -----------------------------
-            # 2. Emails from specific sender
-            # -----------------------------
-            if "from:" in q:
-                sender = q.split("from:")[1].split()[0]
-                emails = self.email.get_emails_from(sender)
-
-                if not emails:
-                    return f"No emails found from {sender}"
-
-                return "\n".join(
-                    f"- {e.get('subject', 'No Subject')} ({e.get('date', '')})"
-                    for e in emails
-                )
-
-            # -----------------------------
-            # 3. Send email (basic parsing)
-            # Format: "send email to X subject Y body Z"
-            # -----------------------------
-            if "send" in q:
-
-                # VERY SIMPLE PARSER (we will improve later)
-                return "Send email feature detected. (Stage 2 will add smart parsing + structured extraction.)"
-
-            # fallback
-            return self.email.get_email_summary()
-
-        except Exception as e:
-            logger.error(f"EmailTool error: {e}")
-            return f"Email error: {e}"
+    
+        # ================= READ =================
+        if "unread" in q:
+            return {
+                "success": True,
+                "action": "read_unread",
+                "data": self.email.get_unread_emails()
+            }
+    
+        if "latest" in q:
+            return {
+                "success": True,
+                "action": "read_latest",
+                "data": self.email.get_latest_email()
+            }
+    
+        # ================= SEARCH =================
+        if "search" in q or "about" in q:
+            return {
+                "success": True,
+                "action": "search",
+                "data": self.email.search_emails(q)
+            }
+    
+        # ================= SEND =================
+        if "send" in q:
+            return {
+                "success": True,
+                "action": "send",
+                "message": "Send email detected (parser will improve next stage)"
+            }
+    
+        # fallback
+        return {
+            "success": True,
+            "action": "summary",
+            "data": self.email.get_unread_emails()
+        }
