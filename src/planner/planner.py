@@ -21,25 +21,28 @@ class Planner:
         # =====================================================
         if any(k in t for k in ["email", "mail", "gmail", "inbox"]):
 
+            # SEND EMAIL
             if "send" in t:
                 plan.append({
                     "tool": "email",
-                    "action": "send_email",
+                    "action": "send",
                     "input": {
                         "raw": query
                     }
                 })
 
+            # FILTER EMAILS
             elif "from:" in t:
                 sender = t.split("from:")[-1].split()[0]
                 plan.append({
                     "tool": "email",
-                    "action": "get_from_sender",
+                    "action": "get_from",
                     "input": {
                         "sender": sender
                     }
                 })
 
+            # DEFAULT → unread emails
             else:
                 plan.append({
                     "tool": "email",
@@ -48,20 +51,20 @@ class Planner:
                 })
 
         # =====================================================
-        # SPOTIFY INTENT (future-ready)
+        # SPOTIFY INTENT
         # =====================================================
         elif any(k in t for k in ["spotify", "play", "song", "music"]):
 
             plan.append({
                 "tool": "spotify",
-                "action": "play_song",
+                "action": "play",
                 "input": {
                     "query": query
                 }
             })
 
         # =====================================================
-        # CALENDAR INTENT (future-ready)
+        # CALENDAR INTENT
         # =====================================================
         elif any(k in t for k in ["calendar", "schedule", "meeting", "reminder"]):
 
@@ -74,7 +77,7 @@ class Planner:
             })
 
         # =====================================================
-        # SYSTEM INTENT (future-ready)
+        # SYSTEM INTENT
         # =====================================================
         elif any(k in t for k in ["open", "file", "folder", "system"]):
 
@@ -86,6 +89,9 @@ class Planner:
                 }
             })
 
+        # =====================================================
+        # NO PLAN
+        # =====================================================
         if not plan:
             return None
 
