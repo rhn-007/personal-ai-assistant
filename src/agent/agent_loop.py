@@ -7,11 +7,11 @@ class AgentLoop:
     """
     Stage 6 Agent Loop (App-Integration Ready)
 
-    Supports:
-    - tool routing
-    - action-based execution
-    - structured planner output
-    - safe execution
+    Features:
+    - structured plan execution
+    - action-based tool calls
+    - safe normalization
+    - multi-app ready architecture
     """
 
     def __init__(
@@ -31,19 +31,16 @@ class AgentLoop:
 
     def run(self, user_input: str):
 
-        # 1. CREATE TASK
         task = self.task_manager.create_task(user_input)
         task_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
 
-        # 2. CREATE PLAN
         plan = self.planner.create_plan(user_input)
 
-        if not plan or not isinstance(plan, list):
+        if not plan:
             return None
 
         results = []
 
-        # 3. EXECUTE PLAN STEPS
         for step in plan:
 
             if not isinstance(step, dict):
@@ -51,14 +48,11 @@ class AgentLoop:
 
             tool_name = step.get("tool")
             action = step.get("action", "default")
-            query = step.get("input", user_input)
+            payload = step.get("input", {})
 
             if not tool_name:
                 continue
 
-            # =================================================
-            # TOOL LOOKUP (UPDATED API)
-            # =================================================
             tool = self.tool_manager.get_tool_by_name(tool_name)
 
             if not tool:
@@ -66,45 +60,45 @@ class AgentLoop:
 
             try:
                 # =================================================
-                # TOOL EXECUTION (ACTION-AWARE)
+                # ACTION-FIRST EXECUTION (PRIMARY)
                 # =================================================
+                output = None
+
                 if hasattr(tool, "execute_action"):
-                    output = tool.execute_action(action, query)
-                else:
-                    output = tool.execute(query)
+                    output = tool.execute_action(action, payload)
+
+                elif hasattr(tool, "execute"):
+                    output = tool.execute({
+                        "action": action,
+                        "input": payload
+                    })
 
                 if output is None:
                     continue
 
-                normalized_output = self._normalize(output)
-                results.append(normalized_output)
+                normalized = self._normalize(output)
+                results.append(normalized)
 
                 # =================================================
-                # TASK UPDATE
+                # TASK TRACKING
                 # =================================================
                 if task_id:
                     try:
-                        self.task_manager.update_task(
-                            task_id,
-                            step,
-                            normalized_output
-                        )
+                        self.task_manager.update_task(task_id, step, normalized)
                     except Exception:
                         pass
 
             except Exception as e:
 
+                error_msg = f"{tool_name} failed: {str(e)}"
+                results.append(error_msg)
+
                 if task_id:
                     try:
-                        self.task_manager.update_task(
-                            task_id,
-                            step,
-                            f"ERROR: {str(e)}"
-                        )
+                        self.task_manager.update_task(task_id, step, error_msg)
                     except Exception:
                         pass
 
-        # 4. COMPLETE TASK
         if task_id:
             try:
                 self.task_manager.complete_task(task_id, results)
@@ -119,7 +113,7 @@ class AgentLoop:
 
     def _normalize(self, output):
         """
-        Convert all tool outputs into safe strings
+        Converts all tool outputs into safe strings
         """
 
         if output is None:
@@ -129,11 +123,17 @@ class AgentLoop:
             return output
 
         if isinstance(output, dict):
-            # common patterns
+
+            # common structured tool responses
             if "result" in output:
                 return str(output["result"])
+
             if "message" in output:
                 return str(output["message"])
+
+            if "data" in output:
+                return str(output["data"])
+
             return str(output)
 
         if isinstance(output, list):
