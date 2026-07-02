@@ -10,10 +10,10 @@ class Planner:
 
     def create_plan(self, query: str):
 
-        if not query:
+        if not query or not isinstance(query, str):
             return None
 
-        t = query.lower()
+        t = query.lower().strip()
         plan = []
 
         # =====================================================
@@ -22,7 +22,7 @@ class Planner:
         if any(k in t for k in ["email", "mail", "gmail", "inbox"]):
 
             # SEND EMAIL
-            if "send" in t:
+            if any(k in t for k in ["send", "compose", "write"]):
                 plan.append({
                     "tool": "email",
                     "action": "send",
@@ -31,9 +31,9 @@ class Planner:
                     }
                 })
 
-            # FILTER EMAILS
+            # FROM FILTER
             elif "from:" in t:
-                sender = t.split("from:")[-1].split()[0]
+                sender = t.split("from:")[-1].split()[0].strip()
                 plan.append({
                     "tool": "email",
                     "action": "get_from",
@@ -42,7 +42,7 @@ class Planner:
                     }
                 })
 
-            # DEFAULT → unread emails
+            # DEFAULT → unread
             else:
                 plan.append({
                     "tool": "email",
@@ -51,9 +51,9 @@ class Planner:
                 })
 
         # =====================================================
-        # SPOTIFY INTENT
+        # SPOTIFY / MUSIC INTENT
         # =====================================================
-        elif any(k in t for k in ["spotify", "play", "song", "music"]):
+        elif any(k in t for k in ["spotify", "play", "song", "music", "audio"]):
 
             plan.append({
                 "tool": "spotify",
@@ -66,33 +66,39 @@ class Planner:
         # =====================================================
         # CALENDAR INTENT
         # =====================================================
-        elif any(k in t for k in ["calendar", "schedule", "meeting", "reminder"]):
+        elif any(k in t for k in ["calendar", "schedule", "meeting", "reminder", "event"]):
 
             plan.append({
                 "tool": "calendar",
-                "action": "create_event",
+                "action": "create",
                 "input": {
                     "query": query
                 }
             })
 
         # =====================================================
-        # SYSTEM INTENT
+        # SYSTEM / DEVICE CONTROL
         # =====================================================
-        elif any(k in t for k in ["open", "file", "folder", "system"]):
+        elif any(k in t for k in ["open", "file", "folder", "system", "launch"]):
 
             plan.append({
                 "tool": "system",
-                "action": "open_app",
+                "action": "open",
                 "input": {
                     "query": query
                 }
             })
 
         # =====================================================
-        # NO PLAN
+        # FALLBACK (IMPORTANT FOR AI FLOW)
         # =====================================================
-        if not plan:
-            return None
+        else:
+            plan.append({
+                "tool": "llm",
+                "action": "chat",
+                "input": {
+                    "query": query
+                }
+            })
 
         return plan
