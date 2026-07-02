@@ -135,10 +135,6 @@ class PersonalAssistant:
             if agent_result:
                 return agent_result
 
-            tool_result = self._run_tools(user_input)
-            if tool_result:
-                return tool_result
-
             plan_result = self._run_planner(user_input)
             if plan_result:
                 return plan_result
