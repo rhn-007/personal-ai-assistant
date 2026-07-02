@@ -1,56 +1,66 @@
-from src.utils.logger import setup_logger
 from src.integrations.spotify import SpotifyIntegration
+from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class SpotifyTool:
     """
-    Tool wrapper for SpotifyIntegration
-    Converts natural language actions → Spotify API calls
+    Clean Spotify Tool (FIXED + consistent indentation)
     """
 
     def __init__(self):
         self.name = "spotify"
         self.spotify = SpotifyIntegration()
 
-    # ---------------- ROUTING ----------------
+        logger.info("SpotifyTool initialized successfully")
 
     def can_handle(self, query: str) -> bool:
+        if not query:
+            return False
+
         q = query.lower()
+
         return any(k in q for k in [
-            "spotify", "play", "song", "music", "pause", "next", "previous", "volume"
+            "spotify",
+            "play",
+            "pause",
+            "next",
+            "previous",
+            "song",
+            "music"
         ])
 
-    # ---------------- MAIN EXECUTION ----------------
-
     def execute(self, query: str):
-
         q = query.lower()
 
         try:
-             if "play" in q:
-                song = query.lower().replace("play", "").strip()
-        
+            # PLAY SONG
+            if "play" in q:
+                song = q.replace("play", "").strip()
+
                 if not song:
-                    return "Please specify a song"
-        
+                    return "Please specify a song name"
+
                 self.spotify.play_song(song)
-                return f"🎵 Playing {song} on Spotify"
-        
+                return f"🎵 Playing {song}"
+
+            # PAUSE
             if "pause" in q:
                 self.spotify.pause()
                 return "⏸️ Paused Spotify"
-        
+
+            # NEXT
             if "next" in q:
                 self.spotify.next()
                 return "⏭️ Next song"
-        
+
+            # PREVIOUS
             if "previous" in q:
                 self.spotify.previous()
                 return "⏮️ Previous song"
-                
-            return None
+
+            return "Spotify command not recognized"
 
         except Exception as e:
             logger.error(f"Spotify tool error: {e}")
