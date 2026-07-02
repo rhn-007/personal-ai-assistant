@@ -88,8 +88,8 @@ class EmailIntegration:
             if self._get_email(msg["id"])
         ]
 
-    def get_unread_emails(self):
-        return self.get_emails("is:unread")
+    def get_unread_emails(self, max_results: int = 5):
+        return self.get_emails("is:unread", max_results)
 
     def get_latest_email(self):
         emails = self.get_emails("in:inbox", 1)
