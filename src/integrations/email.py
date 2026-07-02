@@ -1,203 +1,112 @@
-"""
-Email Integration - Gmail support (Stable + Import-safe version)
-"""
-
-import os
-import base64
-import pickle
-from typing import List, Dict, Optional
-
-from email.mime.text import MIMEText
-
-# ---------------- SAFE LOGGER (prevents import crashes) ----------------
-try:
-    from src.utils.logger import setup_logger
-    logger = setup_logger(__name__)
-except Exception:
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-
-# ---------------- GOOGLE IMPORTS ----------------
-from google.auth.transport.requests import Request
-from google.oauth2 import service_account
-from google_auth_oauthlib.flow import InstalledAppFlow
-import googleapiclient.discovery
-
-
 class EmailIntegration:
-    """
-    Gmail integration for:
-    - Reading emails
-    - Fetching unread messages
-    - Sending emails
-    """
-
-    SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+    SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
     def __init__(self):
         self.service = None
         self._authenticate()
 
-    # =========================================================
-    # AUTHENTICATION
-    # =========================================================
-    def _authenticate(self):
-        """Authenticate Gmail safely (handles all edge cases)"""
+    # =====================================================
+    # BASIC EMAIL FETCHING
+    # =====================================================
 
-        try:
-            creds = None
+    def get_emails(self, query="is:unread", max_results=5):
+        if not self.service:
+            return []
 
-            credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
+        results = self.service.users().messages().list(
+            userId="me",
+            q=query,
+            maxResults=max_results
+        ).execute()
 
-            # 1. SERVICE ACCOUNT (optional)
-            if credentials_file and os.path.exists(credentials_file):
-                creds = service_account.Credentials.from_service_account_file(
-                    credentials_file,
-                    scopes=self.SCOPES
-                )
+        messages = results.get("messages", [])
 
-            token_file = "token.json"
+        emails = []
+        for msg in messages:
+            email = self._get_email(msg["id"])
+            if email:
+                emails.append(email)
 
-            # 2. OAUTH TOKEN
-            if not creds:
-                if os.path.exists(token_file):
-                    with open(token_file, "rb") as token:
-                        creds = pickle.load(token)
+        return emails
 
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
+    def get_unread_emails(self):
+        return self.get_emails("is:unread")
 
-                elif not creds:
-                    if not os.path.exists("credentials.json"):
-                        raise FileNotFoundError(
-                            "Missing credentials.json (Google OAuth required)"
-                        )
+    def get_latest_email(self):
+        emails = self.get_emails("in:inbox", 1)
+        return emails[0] if emails else None
 
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        "credentials.json",
-                        self.SCOPES
-                    )
+    def search_emails(self, query: str):
+        return self.get_emails(query)
 
-                    creds = flow.run_local_server(port=0)
+    # =====================================================
+    # EMAIL DETAILS
+    # =====================================================
 
-                # Save token
-                with open(token_file, "wb") as token:
-                    pickle.dump(creds, token)
+    def _get_email(self, message_id):
+        msg = self.service.users().messages().get(
+            userId="me",
+            id=message_id,
+            format="full"
+        ).execute()
 
-            # Build Gmail service
-            self.service = googleapiclient.discovery.build(
-                "gmail",
-                "v1",
-                credentials=creds
-            )
+        headers = msg.get("payload", {}).get("headers", [])
 
-            logger.info("Gmail authentication successful")
+        def get_header(name):
+            return next((h["value"] for h in headers if h["name"] == name), "")
 
-        except Exception as e:
-            logger.warning(f"Gmail authentication failed: {e}")
-            self.service = None
+        return {
+            "id": message_id,
+            "subject": get_header("Subject"),
+            "from": get_header("From"),
+            "to": get_header("To"),
+            "date": get_header("Date")
+        }
 
-    # =========================================================
+    # =====================================================
     # SEND EMAIL
-    # =========================================================
-    def send_email(self, to: str, subject: str, body: str, html: bool = False) -> bool:
-        """Send email via Gmail API"""
+    # =====================================================
 
-        if not self.service:
-            return False
+    def send_email(self, to, subject, body):
+        from email.mime.text import MIMEText
+        import base64
 
-        try:
-            message = MIMEText(body, "html" if html else "plain")
-            message["to"] = to
-            message["subject"] = subject
+        message = MIMEText(body)
+        message["to"] = to
+        message["subject"] = subject
 
-            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
-            self.service.users().messages().send(
-                userId="me",
-                body={"raw": raw}
-            ).execute()
+        self.service.users().messages().send(
+            userId="me",
+            body={"raw": raw}
+        ).execute()
 
-            return True
+        return True
 
-        except Exception as e:
-            logger.error(f"Send email error: {e}")
-            return False
+    # =====================================================
+    # FUTURE ACTIONS (PLACEHOLDERS FOR STAGE 2)
+    # =====================================================
 
-    # =========================================================
-    # FETCH EMAILS
-    # =========================================================
-    def get_emails(self, query: str = "is:unread", max_results: int = 5) -> List[Dict]:
-        """Generic email fetch"""
+    def delete_email(self, message_id):
+        self.service.users().messages().delete(
+            userId="me",
+            id=message_id
+        ).execute()
+        return True
 
-        if not self.service:
-            return []
+    def mark_as_read(self, message_id):
+        self.service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"removeLabelIds": ["UNREAD"]}
+        ).execute()
+        return True
 
-        try:
-            results = self.service.users().messages().list(
-                userId="me",
-                q=query,
-                maxResults=max_results
-            ).execute()
-
-            messages = results.get("messages", [])
-
-            emails = []
-            for msg in messages:
-                email_data = self._get_email_content(msg["id"])
-                if email_data:
-                    emails.append(email_data)
-
-            return emails
-
-        except Exception as e:
-            logger.error(f"Get emails error: {e}")
-            return []
-
-    def _get_email_content(self, message_id: str) -> Optional[Dict]:
-        """Fetch single email details"""
-
-        try:
-            msg = self.service.users().messages().get(
-                userId="me",
-                id=message_id,
-                format="full"
-            ).execute()
-
-            headers = msg.get("payload", {}).get("headers", [])
-
-            def get_header(name):
-                return next((h["value"] for h in headers if h["name"] == name), "")
-
-            return {
-                "id": message_id,
-                "subject": get_header("Subject") or "No Subject",
-                "from": get_header("From") or "Unknown",
-                "to": get_header("To"),
-                "date": get_header("Date")
-            }
-
-        except Exception as e:
-            logger.error(f"Email parse error: {e}")
-            return None
-
-    # =========================================================
-    # HELPERS
-    # =========================================================
-    def get_unread_emails(self, max_results: int = 5) -> List[Dict]:
-        return self.get_emails("is:unread", max_results)
-
-    def get_emails_from(self, sender: str, max_results: int = 5) -> List[Dict]:
-        return self.get_emails(f"from:{sender}", max_results)
-
-    def get_email_summary(self) -> str:
-        emails = self.get_unread_emails()
-
-        if not emails:
-            return "No unread emails found."
-
-        return "\n".join(
-            f"- {e.get('subject','No Subject')} | {e.get('from','Unknown')}"
-            for e in emails
-        )
+    def archive_email(self, message_id):
+        self.service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"removeLabelIds": ["INBOX"]}
+        ).execute()
+        return True
