@@ -1,119 +1,75 @@
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import webbrowser
+from urllib.parse import quote
 from src.utils.logger import setup_logger
-import os
 
 logger = setup_logger(__name__)
 
 
 class SpotifyIntegration:
     """
-    Clean Spotify API wrapper (stable + agent-ready + Jarvis-safe)
+    Open-App Mode Spotify (Jarvis-style safe fallback)
+    No API dependency, no auth issues, always works.
     """
 
     def __init__(self):
-        try:
-            self.sp = spotipy.Spotify(
-                auth_manager=SpotifyOAuth(
-                    client_id=os.getenv("SPOTIPY_CLIENT_ID"),
-                    client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
-                    redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
-                    scope="user-modify-playback-state user-read-playback-state"
-                )
-            )
-            logger.info("Spotify authentication successful")
-
-        except Exception as e:
-            logger.error(f"Spotify init failed: {e}")
-            self.sp = None
+        logger.info("Spotify running in OPEN-APP MODE")
 
     # =========================================================
-    # SEARCH TRACK (FIXED: returns SINGLE OBJECT)
+    # SEARCH (OPENS SPOTIFY SEARCH PAGE)
     # =========================================================
     def search_track(self, query: str):
         try:
-            if not self.sp:
-                return None
-
-            results = self.sp.search(q=query, limit=1, type="track")
-            items = results.get("tracks", {}).get("items", [])
-
-            if not items:
-                return None
-
-            track = items[0]
+            url = f"https://open.spotify.com/search/{quote(query)}"
+            webbrowser.open(url)
 
             return {
-                "name": track["name"],
-                "artist": track["artists"][0]["name"],
-                "uri": track["uri"],
-                "url": track["external_urls"]["spotify"]
+                "mode": "open_app",
+                "query": query,
+                "url": url,
+                "message": "Opened Spotify search"
             }
 
         except Exception as e:
-            logger.error(f"Search error: {e}")
+            logger.error(f"Spotify open error: {e}")
             return None
 
     # =========================================================
-    # PLAY TRACK (SAFE)
+    # PLAY TRACK (ALSO OPENS SEARCH)
     # =========================================================
-    def play(self, uri: str = None):
+    def play(self, query: str):
         try:
-            if not self.sp:
-                return False
+            url = f"https://open.spotify.com/search/{quote(query)}"
+            webbrowser.open(url)
 
-            if uri:
-                self.sp.start_playback(uris=[uri])
-            else:
-                self.sp.start_playback()
-
-            return True
+            return {
+                "mode": "open_app",
+                "action": "play_request",
+                "query": query,
+                "url": url,
+                "message": "Opened Spotify for playback"
+            }
 
         except Exception as e:
             logger.error(f"Play error: {e}")
-            return False
+            return None
 
     # =========================================================
-    # PAUSE
+    # CONTROL COMMANDS (OPEN APP ONLY)
     # =========================================================
     def pause(self):
-        try:
-            if not self.sp:
-                return False
+        return {
+            "mode": "manual",
+            "message": "Pause manually in Spotify app"
+        }
 
-            self.sp.pause_playback()
-            return True
-
-        except Exception as e:
-            logger.error(f"Pause error: {e}")
-            return False
-
-    # =========================================================
-    # NEXT TRACK
-    # =========================================================
     def next(self):
-        try:
-            if not self.sp:
-                return False
+        return {
+            "mode": "manual",
+            "message": "Skip track manually in Spotify app"
+        }
 
-            self.sp.next_track()
-            return True
-
-        except Exception as e:
-            logger.error(f"Next error: {e}")
-            return False
-
-    # =========================================================
-    # PREVIOUS TRACK
-    # =========================================================
     def previous(self):
-        try:
-            if not self.sp:
-                return False
-
-            self.sp.previous_track()
-            return True
-
-        except Exception as e:
-            logger.error(f"Previous error: {e}")
-            return False
+        return {
+            "mode": "manual",
+            "message": "Go to previous track manually in Spotify app"
+        }
