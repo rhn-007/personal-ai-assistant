@@ -32,36 +32,25 @@ class SpotifyTool:
         ])
 
     def execute(self, query: str):
-        q = query.lower()
+         q = query.lower()
 
         try:
-            # PLAY SONG
             if "play" in q:
                 song = q.replace("play", "").strip()
-
+    
                 if not song:
                     return "Please specify a song name"
-
-                self.spotify.play_song(song)
-                return f"🎵 Playing {song}"
-
-            # PAUSE
-            if "pause" in q:
-                self.spotify.pause()
-                return "⏸️ Paused Spotify"
-
-            # NEXT
-            if "next" in q:
-                self.spotify.next()
-                return "⏭️ Next song"
-
-            # PREVIOUS
-            if "previous" in q:
-                self.spotify.previous()
-                return "⏮️ Previous song"
-
-            return "Spotify command not recognized"
-
+    
+                result = self.spotify.search_track(song)
+    
+                if not result:
+                    return "No song found"
+    
+                track = result[0]
+    
+                return f"🎵 Found: {track['name']} by {track['artist']}"
+    
+            return "Spotify ready"
+    
         except Exception as e:
-            logger.error(f"Spotify tool error: {e}")
             return f"Spotify Error: {e}"
