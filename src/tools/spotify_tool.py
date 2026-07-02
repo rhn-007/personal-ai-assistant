@@ -29,41 +29,28 @@ class SpotifyTool:
         q = query.lower()
 
         try:
-            # PLAY SONG
-            if "play" in q:
-                # remove trigger words
-                clean_query = query.replace("play", "").strip()
-
-                if not clean_query:
-                    return "Please specify what to play"
-
-                return self.spotify.play_song(clean_query)
-
-            # PAUSE
+             if "play" in q:
+                song = query.lower().replace("play", "").strip()
+        
+                if not song:
+                    return "Please specify a song"
+        
+                self.spotify.play_song(song)
+                return f"🎵 Playing {song} on Spotify"
+        
             if "pause" in q:
                 self.spotify.pause()
-                return "Music paused"
-
-            # NEXT
+                return "⏸️ Paused Spotify"
+        
             if "next" in q:
                 self.spotify.next()
-                return "Next track"
-
-            # PREVIOUS
+                return "⏭️ Next song"
+        
             if "previous" in q:
                 self.spotify.previous()
-                return "Previous track"
-
-            # VOLUME UP/DOWN (simple version)
-            if "volume" in q:
-                if "up" in q:
-                    self.spotify.volume(80)
-                    return "Volume increased"
-                elif "down" in q:
-                    self.spotify.volume(30)
-                    return "Volume decreased"
-
-            return "Spotify command not understood"
+                return "⏮️ Previous song"
+                
+            return None
 
         except Exception as e:
             logger.error(f"Spotify tool error: {e}")
