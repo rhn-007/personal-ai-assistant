@@ -6,25 +6,15 @@ logger = setup_logger(__name__)
 
 class CalendarTool:
     """
-    Simple Calendar Tool (Stage 1 - Local / Mock Mode)
-
-    Later upgrade: Google Calendar API integration
+    Simple in-memory Calendar Tool (Stage 1)
     """
 
     def __init__(self):
-        self.events = []  # in-memory storage (for now)
+        self.name = "calendar"  
+        self.events = []
         logger.info("CalendarTool initialized (local mode)")
 
-    # =========================================================
-    # CREATE EVENT
-    # =========================================================
-    def create_event(self, query: str):
-        """
-        Very simple parser (Stage 1)
-        Example:
-        "meeting tomorrow at 5pm"
-        """
-
+    def create(self, query: str):
         event = {
             "title": query,
             "time": str(datetime.now() + timedelta(hours=1)),
@@ -35,25 +25,17 @@ class CalendarTool:
 
         return {
             "status": "success",
-            "message": "Event added to calendar",
+            "message": "Event created",
             "event": event
         }
 
-    # =========================================================
-    # VIEW EVENTS
-    # =========================================================
-    def view_events(self, query: str=None):
+    def view(self, query: str = None):
         if not self.events:
             return {"message": "No events found"}
 
-        return {
-            "events": self.events
-        }
+        return {"events": self.events}
 
-    # =========================================================
-    # DELETE LAST EVENT (simple control)
-    # =========================================================
-    def delete_last(self, query: str=None):
+    def delete(self, query: str = None):
         if not self.events:
             return {"message": "No events to delete"}
 
@@ -64,17 +46,12 @@ class CalendarTool:
             "event": removed
         }
 
-    # =========================================================
-    # ROUTER (IMPORTANT for Agent Loop compatibility)
-    # =========================================================
     def execute_action(self, action: str, query: str):
-        if action in ["create", "create_event", "add"]:
-            return self.create_event(query)
-
-        elif action in ["view", "list", "get"]:
-            return self.view_events(query)
-
-        elif action in ["delete", "remove"]:
-            return self.delete_last(query)
+        if action == "create":
+            return self.create(query)
+        elif action == "view":
+            return self.view(query)
+        elif action == "delete":
+            return self.delete(query)
 
         return {"error": f"Unknown action: {action}"}
