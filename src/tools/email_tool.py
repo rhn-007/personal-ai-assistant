@@ -9,84 +9,72 @@ logger = setup_logger(__name__)
 
 
 class EmailTool:
-    """
-    Tool for:
-    - Checking unread emails
-    - Fetching emails from a sender
-    - Sending emails (basic stage)
-    """
-
     def __init__(self):
         self.name = "email"
-        self.email = None
+        self.email = EmailIntegration()
 
-        try:
-            self.email = EmailIntegration()
-            logger.info("EmailTool initialized successfully")
-        except Exception as e:
-            logger.warning(f"EmailTool disabled: {e}")
+    # =========================================================
+    # TOOL CAPABILITY CHECK (still used by router fallback)
+    # =========================================================
 
-    # ----------------------------------------------------
-    # Tool Capability Check
-    # ----------------------------------------------------
+    def can_handle(self, query: str):
+        if not isinstance(query, str):
+            return False
 
-    def can_handle(self, query: str) -> bool:
-        """
-        Decide if this query is email-related.
-        """
-        keywords = [
+        q = query.lower()
+        return any(k in q for k in [
             "email", "mail", "gmail", "inbox",
-            "unread", "send email", "check mail",
-            "from:", "send to", "compose"
-        ]
+            "unread", "send", "from:"
+        ])
 
-        q = query.lower()
-        return any(k in q for k in keywords)
+    # =========================================================
+    # NEW UNIFIED EXECUTION
+    # =========================================================
 
-    # ----------------------------------------------------
-    # Main Execution
-    # ----------------------------------------------------
+    def execute(self, payload):
 
-    def execute(self, query: str):
-        if not self.email:
-            return {"success": False, "message": "Email system not available"}
-    
-        q = query.lower()
-    
-        # ================= READ =================
-        if "unread" in q:
-            return {
-                "success": True,
-                "action": "read_unread",
-                "data": self.email.get_unread_emails()
-            }
-    
-        if "latest" in q:
-            return {
-                "success": True,
-                "action": "read_latest",
-                "data": self.email.get_latest_email()
-            }
-    
-        # ================= SEARCH =================
-        if "search" in q or "about" in q:
-            return {
-                "success": True,
-                "action": "search",
-                "data": self.email.search_emails(q)
-            }
-    
-        # ================= SEND =================
-        if "send" in q:
-            return {
-                "success": True,
-                "action": "send",
-                "message": "Send email detected (parser will improve next stage)"
-            }
-    
-        # fallback
-        return {
-            "success": True,
-            "action": "summary",
-            "data": self.email.get_unread_emails()
-        }
+        # -------------------------
+        # LEGACY SUPPORT (string)
+        # -------------------------
+        if isinstance(payload, str):
+            q = payload.lower()
+
+            if "unread" in q or "inbox" in q:
+                return self.email.get_email_summary()
+
+            if "from:" in q:
+                sender = q.split("from:")[-1].split()[0]
+                emails = self.email.get_emails_from(sender)
+                return "\n".join(e["subject"] for e in emails)
+
+            return self.email.get_email_summary()
+
+        # -------------------------
+        # NEW STRUCTURED MODE
+        # -------------------------
+        if isinstance(payload, dict):
+
+            action = payload.get("action")
+            data = payload.get("input", {})
+
+            # GET UNREAD EMAILS
+            if action == "get_unread":
+                emails = self.email.get_unread_emails()
+                return "\n".join(
+                    f"{e['subject']} | {e['from']}"
+                    for e in emails
+                )
+
+            # GET FROM SENDER
+            if action == "get_from_sender":
+                sender = data.get("sender", "")
+                emails = self.email.get_emails_from(sender)
+                return "\n".join(e["subject"] for e in emails)
+
+            # SEND EMAIL (future)
+            if action == "send_email":
+                return "Send email not implemented yet"
+
+            return f"Unknown email action: {action}"
+
+        return "Invalid payload"
