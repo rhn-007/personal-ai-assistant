@@ -14,6 +14,7 @@ from src.utils.logger import setup_logger
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
 from src.tools.spotify_tool import SpotifyTool
+from src.tools.calendar_tool import CalendarTool
 
 from src.planner.planner import Planner
 from src.agent.task_manager import TaskManager
@@ -53,6 +54,7 @@ class PersonalAssistant:
         # Register tools FIRST
         self.tool_manager.register(EmailTool())
         self.tool_manager.register(SpotifyTool())
+        self.tool_manager.register(CalendarTool())
 
         # ================= PLANNER =================
         self.planner = Planner(self.tool_manager)
