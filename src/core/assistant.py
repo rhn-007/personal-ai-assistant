@@ -1,5 +1,5 @@
 """
-Main Assistant Class - Memory 4.0 + Tool System + Planner + Agent Loop (Stage 5 FIXED)
+Main Assistant Class - Memory 4.0 + Tool System + Planner + Agent Loop (FIXED TOOL-FIRST ARCHITECTURE)
 """
 
 import os
@@ -13,51 +13,51 @@ from src.utils.logger import setup_logger
 
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
+from src.tools.spotify_tool import SpotifyTool
 
 from src.planner.planner import Planner
 from src.agent.task_manager import TaskManager
 from src.agent.agent_loop import AgentLoop
-from src.tools.spotify_tool import SpotifyTool
 
 load_dotenv()
 
 
 class PersonalAssistant:
-    """AI Agent with Memory + Tools + Planner + Agent Loop (Stage 5 FIXED)"""
+    """AI Agent with Memory + Tools + Planner + Agent Loop"""
 
     def __init__(self):
         self.logger = setup_logger(__name__)
-        self.logger.info("Initializing Assistant (Stage 5 Agent)...")
+        self.logger.info("Initializing Assistant (Tool-First Mode)...")
 
-        # CORE SYSTEMS
+        # ================= CORE SYSTEMS =================
         self.memory = MemoryManager()
         self.conversation = ConversationManager(self.memory)
         self.llm = OllamaIntegration()
 
-        # EMAIL SYSTEM
+        # ================= EMAIL SYSTEM =================
         try:
             self.email = EmailIntegration()
         except Exception:
             self.email = None
 
-        # PERSONALITY
+        # ================= PERSONALITY =================
         self.personality_cache = {
             "tone": None,
             "communication_style": None,
             "interests": [],
         }
 
-               # TOOL SYSTEM
+        # ================= TOOL SYSTEM (FIXED ORDER) =================
         self.tool_manager = ToolManager()
-        self.tool_manager.register(EmailTool())
 
-         #SPOTIFY
+        # Register tools FIRST
+        self.tool_manager.register(EmailTool())
         self.tool_manager.register(SpotifyTool())
 
-        # PLANNER
+        # ================= PLANNER =================
         self.planner = Planner(self.tool_manager)
 
-        # AGENT LOOP
+        # ================= AGENT LOOP =================
         self.task_manager = TaskManager()
         self.agent_loop = AgentLoop(
             tool_manager=self.tool_manager,
@@ -65,7 +65,7 @@ class PersonalAssistant:
             task_manager=self.task_manager
         )
 
-        self.logger.info("Assistant ready (Stage 5 Complete)")
+        self.logger.info("Assistant ready (Tool System Active)")
 
     # =========================================================
     # MEMORY CONTEXT
@@ -108,7 +108,22 @@ class PersonalAssistant:
             if w in t:
                 self.memory.add_semantic_memory("interests", w)
 
-   
+    # =========================================================
+    # TOOL EXECUTION (🔥 STEP 1 FIX)
+    # =========================================================
+    def _run_tools(self, user_input: str):
+        try:
+            tool_result = self.tool_manager.execute(user_input)
+
+            if not tool_result or not tool_result.get("handled"):
+                return None
+
+            return tool_result.get("result")
+
+        except Exception as e:
+            self.logger.error(f"Tool error: {e}")
+            return None
+
     # =========================================================
     # AGENT LOOP
     # =========================================================
@@ -124,20 +139,29 @@ class PersonalAssistant:
             return None
 
     # =========================================================
-    # MAIN PIPELINE
+    # MAIN PIPELINE (🔥 FIXED ORDER)
     # =========================================================
     def process_input(self, user_input: str) -> str:
 
         try:
+            # 1. MEMORY CAPTURE
             self._auto_memory_capture(user_input)
 
+            # 2. AGENT LOOP (structured tasks)
             agent_result = self._run_agent_loop(user_input)
             if agent_result:
                 return agent_result
 
+            # 3. TOOL EXECUTION (🔥 IMPORTANT - NOW PRIORITY)
+            tool_result = self._run_tools(user_input)
+            if tool_result:
+                return tool_result
+
+            # 4. EMAIL HANDLER (fallback)
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
+            # 5. LLM FALLBACK
             context = self.conversation.get_context()
 
             memory_context = self._get_memory_context(user_input)
