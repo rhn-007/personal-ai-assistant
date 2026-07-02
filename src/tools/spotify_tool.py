@@ -1,36 +1,70 @@
+from src.utils.logger import setup_logger
+from src.integrations.spotify import SpotifyIntegration
+
+logger = setup_logger(__name__)
+
+
 class SpotifyTool:
+    """
+    Tool wrapper for SpotifyIntegration
+    Converts natural language actions → Spotify API calls
+    """
 
     def __init__(self):
         self.name = "spotify"
+        self.spotify = SpotifyIntegration()
 
-    def can_handle(self, query: str):
+    # ---------------- ROUTING ----------------
+
+    def can_handle(self, query: str) -> bool:
         q = query.lower()
-        return any(k in q for k in ["spotify", "play", "song", "music"])
+        return any(k in q for k in [
+            "spotify", "play", "song", "music", "pause", "next", "previous", "volume"
+        ])
 
-    def execute(self, payload):
+    # ---------------- MAIN EXECUTION ----------------
 
-        # ---------------- STRING MODE (fallback) ----------------
-        if isinstance(payload, str):
-            return f"Spotify received: {payload}"
+    def execute(self, query: str):
 
-        # ---------------- STRUCTURED MODE ----------------
-        if isinstance(payload, dict):
+        q = query.lower()
 
-            action = payload.get("action")
+        try:
+            # PLAY SONG
+            if "play" in q:
+                # remove trigger words
+                clean_query = query.replace("play", "").strip()
 
-            if action == "play":
-                song = payload.get("input", {}).get("song", "unknown")
-                return f"🎵 Playing song: {song}"
+                if not clean_query:
+                    return "Please specify what to play"
 
-            if action == "pause":
-                return "⏸ Spotify paused"
+                return self.spotify.play_song(clean_query)
 
-            if action == "resume":
-                return "▶ Spotify resumed"
+            # PAUSE
+            if "pause" in q:
+                self.spotify.pause()
+                return "Music paused"
 
-            if action == "next":
-                return "⏭ Next track"
+            # NEXT
+            if "next" in q:
+                self.spotify.next()
+                return "Next track"
 
-            return f"Unknown Spotify action: {action}"
+            # PREVIOUS
+            if "previous" in q:
+                self.spotify.previous()
+                return "Previous track"
 
-        return "Invalid Spotify payload"
+            # VOLUME UP/DOWN (simple version)
+            if "volume" in q:
+                if "up" in q:
+                    self.spotify.volume(80)
+                    return "Volume increased"
+                elif "down" in q:
+                    self.spotify.volume(30)
+                    return "Volume decreased"
+
+            return "Spotify command not understood"
+
+        except Exception as e:
+            logger.error(f"Spotify tool error: {e}")
+            return f"Spotify Error: {e}"
