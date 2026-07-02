@@ -135,10 +135,6 @@ class PersonalAssistant:
             if agent_result:
                 return agent_result
 
-            plan_result = self._run_planner(user_input)
-            if plan_result:
-                return plan_result
-
             if self.email and self._is_email_query(user_input):
                 return self._handle_email_query(user_input)
 
