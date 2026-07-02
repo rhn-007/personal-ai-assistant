@@ -142,3 +142,13 @@ class EmailIntegration:
         ).execute()
 
         return True
+    def get_email_summary(self, max_results: int = 5) -> str:
+        emails = self.get_unread_emails(max_results)
+    
+        if not emails:
+            return "No unread emails found."
+    
+        return "\n".join(
+            f"- {e.get('subject', 'No Subject')} | {e.get('from', 'Unknown')}"
+            for e in emails
+        )
