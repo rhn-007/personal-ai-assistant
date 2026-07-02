@@ -8,17 +8,12 @@ class Planner:
     def __init__(self, tool_manager):
         self.tool_manager = tool_manager
 
-    # =========================================================
-    # MAIN FUNCTION
-    # =========================================================
-
     def create_plan(self, query: str):
 
         if not query:
             return None
 
         t = query.lower()
-
         plan = []
 
         # =====================================================
@@ -29,15 +24,27 @@ class Planner:
             if "send" in t:
                 plan.append({
                     "tool": "email",
-                    "action": "send",
-                    "input": query
+                    "action": "send_email",
+                    "input": {
+                        "raw": query
+                    }
+                })
+
+            elif "from:" in t:
+                sender = t.split("from:")[-1].split()[0]
+                plan.append({
+                    "tool": "email",
+                    "action": "get_from_sender",
+                    "input": {
+                        "sender": sender
+                    }
                 })
 
             else:
                 plan.append({
                     "tool": "email",
-                    "action": "read",
-                    "input": query
+                    "action": "get_unread",
+                    "input": {}
                 })
 
         # =====================================================
@@ -47,8 +54,10 @@ class Planner:
 
             plan.append({
                 "tool": "spotify",
-                "action": "play",
-                "input": query
+                "action": "play_song",
+                "input": {
+                    "query": query
+                }
             })
 
         # =====================================================
@@ -58,24 +67,25 @@ class Planner:
 
             plan.append({
                 "tool": "calendar",
-                "action": "create",
-                "input": query
+                "action": "create_event",
+                "input": {
+                    "query": query
+                }
             })
 
         # =====================================================
-        # FILE / SYSTEM INTENT (future-ready)
+        # SYSTEM INTENT (future-ready)
         # =====================================================
         elif any(k in t for k in ["open", "file", "folder", "system"]):
 
             plan.append({
                 "tool": "system",
-                "action": "open",
-                "input": query
+                "action": "open_app",
+                "input": {
+                    "query": query
+                }
             })
 
-        # =====================================================
-        # DEFAULT: no plan
-        # =====================================================
         if not plan:
             return None
 
