@@ -8,66 +8,112 @@ logger = setup_logger(__name__)
 
 class SpotifyIntegration:
     """
-    Clean Spotify API wrapper (fixed + minimal + working)
+    Clean Spotify API wrapper (stable + agent-ready + Jarvis-safe)
     """
 
     def __init__(self):
-        self.sp = spotipy.Spotify(
-            auth_manager=SpotifyOAuth(
-                client_id=os.getenv("SPOTIPY_CLIENT_ID"),
-                client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
-                redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
-                scope="user-modify-playback-state user-read-playback-state"
+        try:
+            self.sp = spotipy.Spotify(
+                auth_manager=SpotifyOAuth(
+                    client_id=os.getenv("SPOTIPY_CLIENT_ID"),
+                    client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
+                    redirect_uri=os.getenv("SPOTIPY_REDIRECT_URI"),
+                    scope="user-modify-playback-state user-read-playback-state"
+                )
             )
-        )
+            logger.info("Spotify authentication successful")
 
-        logger.info("Spotify authentication successful")
+        except Exception as e:
+            logger.error(f"Spotify init failed: {e}")
+            self.sp = None
 
-    # -----------------------------
-    # SEARCH TRACKS (FIXED METHOD)
-    # -----------------------------
+    # =========================================================
+    # SEARCH TRACK (FIXED: returns SINGLE OBJECT)
+    # =========================================================
     def search_track(self, query: str):
-        """
-        Returns simplified track list
-        """
-        results = self.sp.search(q=query, limit=1, type="track")
+        try:
+            if not self.sp:
+                return None
 
-        items = results.get("tracks", {}).get("items", [])
+            results = self.sp.search(q=query, limit=1, type="track")
+            items = results.get("tracks", {}).get("items", [])
 
-        if not items:
+            if not items:
+                return None
+
+            track = items[0]
+
+            return {
+                "name": track["name"],
+                "artist": track["artists"][0]["name"],
+                "uri": track["uri"],
+                "url": track["external_urls"]["spotify"]
+            }
+
+        except Exception as e:
+            logger.error(f"Search error: {e}")
             return None
 
-        track = items[0]
-
-        return [{
-            "name": track["name"],
-            "artist": track["artists"][0]["name"],
-            "uri": track["uri"]
-        }]
-
-    # -----------------------------
-    # PLAY TRACK
-    # -----------------------------
+    # =========================================================
+    # PLAY TRACK (SAFE)
+    # =========================================================
     def play(self, uri: str = None):
-        if uri:
-            self.sp.start_playback(uris=[uri])
-        else:
-            self.sp.start_playback()
+        try:
+            if not self.sp:
+                return False
 
-    # -----------------------------
+            if uri:
+                self.sp.start_playback(uris=[uri])
+            else:
+                self.sp.start_playback()
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Play error: {e}")
+            return False
+
+    # =========================================================
     # PAUSE
-    # -----------------------------
+    # =========================================================
     def pause(self):
-        self.sp.pause_playback()
+        try:
+            if not self.sp:
+                return False
 
-    # -----------------------------
-    # NEXT
-    # -----------------------------
+            self.sp.pause_playback()
+            return True
+
+        except Exception as e:
+            logger.error(f"Pause error: {e}")
+            return False
+
+    # =========================================================
+    # NEXT TRACK
+    # =========================================================
     def next(self):
-        self.sp.next_track()
+        try:
+            if not self.sp:
+                return False
 
-    # -----------------------------
-    # PREVIOUS
-    # -----------------------------
+            self.sp.next_track()
+            return True
+
+        except Exception as e:
+            logger.error(f"Next error: {e}")
+            return False
+
+    # =========================================================
+    # PREVIOUS TRACK
+    # =========================================================
     def previous(self):
-        self.sp.previous_track()
+        try:
+            if not self.sp:
+                return False
+
+            self.sp.previous_track()
+            return True
+
+        except Exception as e:
+            logger.error(f"Previous error: {e}")
+            return False
