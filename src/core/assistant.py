@@ -17,6 +17,7 @@ from src.tools.email_tool import EmailTool
 from src.planner.planner import Planner
 from src.agent.task_manager import TaskManager
 from src.agent.agent_loop import AgentLoop
+from src.tools.spotify_tool import SpotifyTool
 
 load_dotenv()
 
@@ -45,6 +46,9 @@ class PersonalAssistant:
             "communication_style": None,
             "interests": [],
         }
+
+        #SPOTIFY
+        self.tool_manager.register(SpotifyTool())
 
         # TOOL SYSTEM
         self.tool_manager = ToolManager()
