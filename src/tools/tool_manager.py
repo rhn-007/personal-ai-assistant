@@ -22,6 +22,9 @@ class ToolManager:
         logger.info(f"Registered tool: {tool.name}")
 
     # ---------------- GET TOOL (FIXED API) ----------------
+    def get_tool_by_name(self, name):
+        return self.get_tool(name)
+    
     def get_tool(self, name: str):
         """
         FIX: restores compatibility with AgentLoop + Planner
