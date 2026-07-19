@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+
 from src.utils.logger import setup_logger
 
 
@@ -18,11 +19,19 @@ class CalendarIntegration:
             "Local Calendar database initialized"
         )
 
+    # =====================================================
+    # DATABASE CONNECTION
+    # =====================================================
+
     def _connect(self):
 
         return sqlite3.connect(
             self.db_path
         )
+
+    # =====================================================
+    # INITIALIZE DATABASE
+    # =====================================================
 
     def _initialize_database(self):
 
@@ -178,49 +187,56 @@ class CalendarIntegration:
         return rows
 
     # =====================================================
-    # DELETE EVENT
+    # DELETE LATEST EVENT
     # =====================================================
 
     def delete_latest_event(self):
 
-    connection = self._connect()
+        connection = self._connect()
 
-    cursor = connection.cursor()
+        cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        SELECT id, title
-        FROM events
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    )
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title
 
-    event = cursor.fetchone()
+            FROM events
 
-    if not event:
+            ORDER BY id DESC
+
+            LIMIT 1
+            """
+        )
+
+        event = cursor.fetchone()
+
+        if not event:
+
+            connection.close()
+
+            return None
+
+        event_id = event[0]
+
+        title = event[1]
+
+        cursor.execute(
+            """
+            DELETE FROM events
+
+            WHERE id = ?
+            """,
+
+            (event_id,)
+        )
+
+        connection.commit()
 
         connection.close()
 
-        return None
-
-    event_id = event[0]
-
-    title = event[1]
-
-    cursor.execute(
-        """
-        DELETE FROM events
-        WHERE id = ?
-        """,
-        (event_id,)
-    )
-
-    connection.commit()
-
-    connection.close()
-
-    return {
-        "id": event_id,
-        "title": title
-    }
+        return {
+            "id": event_id,
+            "title": title
+        }
