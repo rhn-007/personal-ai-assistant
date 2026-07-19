@@ -16,7 +16,7 @@ class Planner:
         # CALENDAR INTENT
         # =====================================================
 
-        elif any(
+        if any(
             word in t
             for word in [
                 "calendar",
@@ -26,7 +26,7 @@ class Planner:
                 "event"
             ]
         ):
-        
+
             # DELETE EVENT
             if any(
                 word in t
@@ -36,7 +36,7 @@ class Planner:
                     "cancel"
                 ]
             ):
-        
+
                 plan.append(
                     {
                         "tool": "calendar",
@@ -46,7 +46,7 @@ class Planner:
                         }
                     }
                 )
-        
+
             # SHOW CALENDAR
             elif any(
                 word in t
@@ -58,7 +58,7 @@ class Planner:
                     "what's on"
                 ]
             ):
-        
+
                 plan.append(
                     {
                         "tool": "calendar",
@@ -66,10 +66,10 @@ class Planner:
                         "input": {}
                     }
                 )
-        
+
             # CREATE EVENT
             else:
-        
+
                 plan.append(
                     {
                         "tool": "calendar",
