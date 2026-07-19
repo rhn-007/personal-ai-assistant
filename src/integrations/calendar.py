@@ -1,1 +1,209 @@
+import sqlite3
+from datetime import datetime
+from src.utils.logger import setup_logger
 
+
+logger = setup_logger(__name__)
+
+
+class CalendarIntegration:
+
+    def __init__(self, db_path="calendar.db"):
+
+        self.db_path = db_path
+
+        self._initialize_database()
+
+        logger.info(
+            "Local Calendar database initialized"
+        )
+
+    def _connect(self):
+
+        return sqlite3.connect(
+            self.db_path
+        )
+
+    def _initialize_database(self):
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS events (
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                title TEXT NOT NULL,
+
+                description TEXT,
+
+                event_date TEXT NOT NULL,
+
+                event_time TEXT,
+
+                created_at TEXT NOT NULL
+
+            )
+            """
+        )
+
+        connection.commit()
+
+        connection.close()
+
+    # =====================================================
+    # CREATE EVENT
+    # =====================================================
+
+    def create_event(
+        self,
+        title,
+        event_date,
+        event_time=None,
+        description=""
+    ):
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        created_at = datetime.now().isoformat()
+
+        cursor.execute(
+            """
+            INSERT INTO events
+            (
+                title,
+                description,
+                event_date,
+                event_time,
+                created_at
+            )
+
+            VALUES (?, ?, ?, ?, ?)
+            """,
+
+            (
+                title,
+                description,
+                event_date,
+                event_time,
+                created_at
+            )
+        )
+
+        connection.commit()
+
+        event_id = cursor.lastrowid
+
+        connection.close()
+
+        return {
+            "id": event_id,
+            "title": title,
+            "date": event_date,
+            "time": event_time
+        }
+
+    # =====================================================
+    # GET ALL EVENTS
+    # =====================================================
+
+    def get_all_events(self):
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title,
+                description,
+                event_date,
+                event_time
+
+            FROM events
+
+            ORDER BY event_date, event_time
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        connection.close()
+
+        return rows
+
+    # =====================================================
+    # GET EVENTS FOR DATE
+    # =====================================================
+
+    def get_events_for_date(
+        self,
+        event_date
+    ):
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title,
+                description,
+                event_date,
+                event_time
+
+            FROM events
+
+            WHERE event_date = ?
+
+            ORDER BY event_time
+            """,
+
+            (event_date,)
+        )
+
+        rows = cursor.fetchall()
+
+        connection.close()
+
+        return rows
+
+    # =====================================================
+    # DELETE EVENT
+    # =====================================================
+
+    def delete_event(
+        self,
+        event_id
+    ):
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM events
+
+            WHERE id = ?
+            """,
+
+            (event_id,)
+        )
+
+        connection.commit()
+
+        deleted = cursor.rowcount > 0
+
+        connection.close()
+
+        return deleted
