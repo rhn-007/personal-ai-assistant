@@ -2,95 +2,229 @@ from src.planner.planner import Planner
 from src.tools.tool_manager import ToolManager
 from src.agent.task_manager import TaskManager
 
-
 class AgentLoop:
-    """
-    Stage 6 Agent Loop (Fully App-Integration Ready)
+"""
+Stage 6 Agent Loop
 
-    - Uses structured planner output
-    - Supports tool + action execution
-    - Uses execute_by_name() safely
-    - Fully automation-ready (Jarvis-style)
-    """
+```
+- Uses structured planner output
+- Supports tool + action execution
+- Executes action-aware tools
+- Supports legacy execute() tools
+- Works with the current ToolManager API
+"""
 
-    def __init__(self, tool_manager: ToolManager, planner: Planner = None, task_manager: TaskManager = None):
+def __init__(
+    self,
+    tool_manager: ToolManager,
+    planner: Planner = None,
+    task_manager: TaskManager = None
+):
 
-        self.tool_manager = tool_manager
-        self.planner = planner if planner else Planner(tool_manager)
-        self.task_manager = task_manager if task_manager else TaskManager()
+    self.tool_manager = tool_manager
+    self.planner = planner if planner else Planner(tool_manager)
+    self.task_manager = task_manager if task_manager else TaskManager()
 
-    # =========================================================
-    # MAIN LOOP
-    # =========================================================
+# =========================================================
+# MAIN LOOP
+# =========================================================
 
-    def run(self, user_input: str):
+def run(self, user_input: str):
 
-        # 1. CREATE TASK
-        task = self.task_manager.create_task(user_input)
-        task_id = task.get("id") if isinstance(task, dict) else getattr(task, "id", None)
+    if not user_input or not isinstance(user_input, str):
+        return None
 
-        # 2. CREATE PLAN
-        plan = self.planner.create_plan(user_input)
-        print(f"DEBUG PLAN: {plan}")
+    # =====================================================
+    # 1. CREATE TASK
+    # =====================================================
 
-        if not plan or not isinstance(plan, list):
-            return None
+    task = self.task_manager.create_task(user_input)
 
-        results = []
+    task_id = (
+        task.get("id")
+        if isinstance(task, dict)
+        else getattr(task, "id", None)
+    )
 
-        # 3. EXECUTE PLAN
-        for step in plan:
+    # =====================================================
+    # 2. CREATE PLAN
+    # =====================================================
 
-            if not isinstance(step, dict):
-                continue
+    plan = self.planner.create_plan(user_input)
 
-            tool_name = step.get("tool")
-            action = step.get("action", "default")
-            query = step.get("input", user_input)
+    print(f"DEBUG PLAN: {plan}")
 
-            if not tool_name:
-                continue
+    if not plan or not isinstance(plan, list):
+        return None
+
+    results = []
+
+    # =====================================================
+    # 3. EXECUTE PLAN
+    # =====================================================
+
+    for step in plan:
+
+        if not isinstance(step, dict):
+            continue
+
+        tool_name = step.get("tool")
+        action = step.get("action", "default")
+        tool_input = step.get("input", user_input)
+
+        if not tool_name:
+            continue
+
+        # -------------------------------------------------
+        # NORMALIZE INPUT
+        # -------------------------------------------------
+
+        if isinstance(tool_input, dict):
+
+            # Most tools currently expect a string query.
+            # For structured inputs, use the raw query if available.
+            query = tool_input.get("raw")
+
+            if query is None:
+                query = tool_input.get("query")
+
+            if query is None:
+                query = user_input
+
+        else:
+            query = tool_input
+
+        try:
 
             # =================================================
-            # TOOL EXECUTION (FIXED)
+            # TOOL LOOKUP
             # =================================================
 
-            try:
-                output = self.tool_manager.execute_by_name(
-                    tool_name,
+            tool = self.tool_manager.get_tool_by_name(tool_name)
+
+            if not tool:
+                result = f"Tool '{tool_name}' not found."
+
+            # =================================================
+            # ACTION-AWARE TOOL
+            # =================================================
+
+            elif hasattr(tool, "execute_action"):
+
+                result = tool.execute_action(
                     action,
                     query
                 )
 
-                if not output:
-                    continue
+            # =================================================
+            # LEGACY TOOL
+            # =================================================
 
-                result = output.get("result")
+            elif hasattr(tool, "execute"):
 
-                if result:
-                    results.append(str(result))
+                result = tool.execute(query)
 
-                # =================================================
-                # TASK UPDATE
-                # =================================================
-                if task_id:
-                    try:
-                        self.task_manager.update_task(task_id, step, result)
-                    except Exception:
-                        pass
+            else:
 
-            except Exception as e:
-                if task_id:
-                    try:
-                        self.task_manager.update_task(task_id, step, f"ERROR: {str(e)}")
-                    except Exception:
-                        pass
+                result = (
+                    f"Tool '{tool_name}' has no "
+                    f"execute_action() or execute() method."
+                )
 
-        # 4. COMPLETE TASK
-        if task_id:
-            try:
-                self.task_manager.complete_task(task_id, results)
-            except Exception:
-                pass
+            # =================================================
+            # NORMALIZE RESULT
+            # =================================================
 
-        return "\n".join(results) if results else None
+            normalized_result = self._normalize(result)
+
+            if normalized_result:
+
+                results.append(normalized_result)
+
+            # =================================================
+            # TASK UPDATE
+            # =================================================
+
+            if task_id:
+
+                try:
+
+                    self.task_manager.update_task(
+                        task_id,
+                        step,
+                        normalized_result
+                    )
+
+                except Exception:
+                    pass
+
+        except Exception as e:
+
+            error_message = f"Tool Error: {str(e)}"
+
+            if task_id:
+
+                try:
+
+                    self.task_manager.update_task(
+                        task_id,
+                        step,
+                        error_message
+                    )
+
+                except Exception:
+                    pass
+
+    # =========================================================
+    # 4. COMPLETE TASK
+    # =========================================================
+
+    if task_id:
+
+        try:
+
+            self.task_manager.complete_task(
+                task_id,
+                results
+            )
+
+        except Exception:
+            pass
+
+    # =========================================================
+    # 5. RETURN RESULT
+    # =========================================================
+
+    return "\n".join(results) if results else None
+
+# =========================================================
+# NORMALIZATION LAYER
+# =========================================================
+
+def _normalize(self, output):
+
+    if output is None:
+        return ""
+
+    if isinstance(output, str):
+        return output
+
+    if isinstance(output, dict):
+
+        if "result" in output:
+            return str(output["result"])
+
+        if "message" in output:
+            return str(output["message"])
+
+        return str(output)
+
+    if isinstance(output, list):
+
+        return "\n".join(
+            str(item)
+            for item in output
+        )
+
+    return str(output)
+```
