@@ -31,6 +31,7 @@ class AgentLoop:
 
         # 2. CREATE PLAN
         plan = self.planner.create_plan(user_input)
+        print(f"DEBUG PLAN: {plan}")
 
         if not plan or not isinstance(plan, list):
             return None
