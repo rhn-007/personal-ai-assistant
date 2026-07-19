@@ -1,75 +1,107 @@
-import webbrowser
-from urllib.parse import quote
+import os
+import urllib.parse
+
 from src.utils.logger import setup_logger
+
 
 logger = setup_logger(__name__)
 
 
 class SpotifyIntegration:
-    """
-    Open-App Mode Spotify (Jarvis-style safe fallback)
-    No API dependency, no auth issues, always works.
-    """
 
     def __init__(self):
-        logger.info("Spotify running in OPEN-APP MODE")
 
-    # =========================================================
-    # SEARCH (OPENS SPOTIFY SEARCH PAGE)
-    # =========================================================
-    def search_track(self, query: str):
+        logger.info(
+            "Spotify running in OPEN-APP SEARCH MODE"
+        )
+
+    def search_and_open(self, query: str):
+
+        if not query:
+
+            return "No song specified."
+
+        # Remove common command words
+        song = query.lower()
+
+        for word in [
+            "play",
+            "open",
+            "search",
+            "find",
+            "on spotify",
+            "spotify"
+        ]:
+
+            song = song.replace(
+                word,
+                ""
+            )
+
+        song = song.strip()
+
+        if not song:
+
+            return "Please specify a song."
+
+        # Encode the song name
+        encoded_song = urllib.parse.quote(
+            song
+        )
+
+        spotify_uri = (
+            f"spotify:search:{encoded_song}"
+        )
+
         try:
-            url = f"https://open.spotify.com/search/{quote(query)}"
-            webbrowser.open(url)
 
-            return {
-                "mode": "open_app",
-                "query": query,
-                "url": url,
-                "message": "Opened Spotify search"
-            }
+            os.startfile(
+                spotify_uri
+            )
+
+            logger.info(
+                f"Opened Spotify search for: {song}"
+            )
+
+            return (
+                f"Opened Spotify search for "
+                f"'{song}'."
+            )
 
         except Exception as e:
-            logger.error(f"Spotify open error: {e}")
-            return None
 
-    # =========================================================
-    # PLAY TRACK (ALSO OPENS SEARCH)
-    # =========================================================
+            logger.error(
+                f"Spotify app search failed: {e}"
+            )
+
+            return (
+                f"Could not open Spotify search: "
+                f"{e}"
+            )
+
     def play(self, query: str):
-        try:
-            url = f"https://open.spotify.com/search/{quote(query)}"
-            webbrowser.open(url)
 
-            return {
-                "mode": "open_app",
-                "action": "play_request",
-                "query": query,
-                "url": url,
-                "message": "Opened Spotify for playback"
-            }
+        return self.search_and_open(
+            query
+        )
 
-        except Exception as e:
-            logger.error(f"Play error: {e}")
-            return None
-
-    # =========================================================
-    # CONTROL COMMANDS (OPEN APP ONLY)
-    # =========================================================
     def pause(self):
-        return {
-            "mode": "manual",
-            "message": "Pause manually in Spotify app"
-        }
+
+        return (
+            "Pause control requires Spotify "
+            "Premium API playback access."
+        )
 
     def next(self):
-        return {
-            "mode": "manual",
-            "message": "Skip track manually in Spotify app"
-        }
+
+        return (
+            "Next-track control requires Spotify "
+            "Premium API playback access."
+        )
 
     def previous(self):
-        return {
-            "mode": "manual",
-            "message": "Go to previous track manually in Spotify app"
-        }
+
+        return (
+            "Previous-track control requires Spotify "
+            "Premium API playback access."
+        )
