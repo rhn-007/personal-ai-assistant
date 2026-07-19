@@ -181,29 +181,46 @@ class CalendarIntegration:
     # DELETE EVENT
     # =====================================================
 
-    def delete_event(
-        self,
-        event_id
-    ):
+    def delete_latest_event(self):
 
-        connection = self._connect()
+    connection = self._connect()
 
-        cursor = connection.cursor()
+    cursor = connection.cursor()
 
-        cursor.execute(
-            """
-            DELETE FROM events
+    cursor.execute(
+        """
+        SELECT id, title
+        FROM events
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    )
 
-            WHERE id = ?
-            """,
+    event = cursor.fetchone()
 
-            (event_id,)
-        )
-
-        connection.commit()
-
-        deleted = cursor.rowcount > 0
+    if not event:
 
         connection.close()
 
-        return deleted
+        return None
+
+    event_id = event[0]
+
+    title = event[1]
+
+    cursor.execute(
+        """
+        DELETE FROM events
+        WHERE id = ?
+        """,
+        (event_id,)
+    )
+
+    connection.commit()
+
+    connection.close()
+
+    return {
+        "id": event_id,
+        "title": title
+    }
