@@ -8,10 +8,9 @@ Stage 6 Agent Loop
 
 ```
 - Uses structured planner output
-- Supports tool + action execution
-- Executes action-aware tools
+- Supports action-based tool execution
 - Supports legacy execute() tools
-- Works with the current ToolManager API
+- Handles task tracking
 """
 
 def __init__(
@@ -20,14 +19,9 @@ def __init__(
     planner: Planner = None,
     task_manager: TaskManager = None
 ):
-
     self.tool_manager = tool_manager
     self.planner = planner if planner else Planner(tool_manager)
     self.task_manager = task_manager if task_manager else TaskManager()
-
-# =========================================================
-# MAIN LOOP
-# =========================================================
 
 def run(self, user_input: str):
 
@@ -75,21 +69,14 @@ def run(self, user_input: str):
         if not tool_name:
             continue
 
-        # -------------------------------------------------
-        # NORMALIZE INPUT
-        # -------------------------------------------------
-
+        # Normalize input
         if isinstance(tool_input, dict):
 
-            # Most tools currently expect a string query.
-            # For structured inputs, use the raw query if available.
-            query = tool_input.get("raw")
-
-            if query is None:
-                query = tool_input.get("query")
-
-            if query is None:
-                query = user_input
+            query = (
+                tool_input.get("raw")
+                or tool_input.get("query")
+                or user_input
+            )
 
         else:
             query = tool_input
@@ -103,6 +90,7 @@ def run(self, user_input: str):
             tool = self.tool_manager.get_tool_by_name(tool_name)
 
             if not tool:
+
                 result = f"Tool '{tool_name}' not found."
 
             # =================================================
@@ -117,7 +105,7 @@ def run(self, user_input: str):
                 )
 
             # =================================================
-            # LEGACY TOOL
+            # STANDARD TOOL
             # =================================================
 
             elif hasattr(tool, "execute"):
@@ -127,8 +115,8 @@ def run(self, user_input: str):
             else:
 
                 result = (
-                    f"Tool '{tool_name}' has no "
-                    f"execute_action() or execute() method."
+                    f"Tool '{tool_name}' does not have "
+                    f"an execute() or execute_action() method."
                 )
 
             # =================================================
@@ -142,7 +130,7 @@ def run(self, user_input: str):
                 results.append(normalized_result)
 
             # =================================================
-            # TASK UPDATE
+            # UPDATE TASK
             # =================================================
 
             if task_id:
@@ -175,9 +163,9 @@ def run(self, user_input: str):
                 except Exception:
                     pass
 
-    # =========================================================
+    # =====================================================
     # 4. COMPLETE TASK
-    # =========================================================
+    # =====================================================
 
     if task_id:
 
@@ -191,14 +179,14 @@ def run(self, user_input: str):
         except Exception:
             pass
 
-    # =========================================================
+    # =====================================================
     # 5. RETURN RESULT
-    # =========================================================
+    # =====================================================
 
     return "\n".join(results) if results else None
 
 # =========================================================
-# NORMALIZATION LAYER
+# NORMALIZATION
 # =========================================================
 
 def _normalize(self, output):
