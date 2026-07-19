@@ -1,57 +1,110 @@
+from src.integrations.calendar import CalendarIntegration
 from src.utils.logger import setup_logger
-from datetime import datetime, timedelta
+
 
 logger = setup_logger(__name__)
 
 
 class CalendarTool:
-    """
-    Simple in-memory Calendar Tool (Stage 1)
-    """
 
     def __init__(self):
-        self.name = "calendar"  
-        self.events = []
-        logger.info("CalendarTool initialized (local mode)")
 
-    def create(self, query: str):
-        event = {
-            "title": query,
-            "time": str(datetime.now() + timedelta(hours=1)),
-            "raw": query
-        }
+        self.name = "calendar"
 
-        self.events.append(event)
+        self.calendar = CalendarIntegration()
 
-        return {
-            "status": "success",
-            "message": "Event created",
-            "event": event
-        }
+        logger.info(
+            "CalendarTool initialized"
+        )
 
-    def view(self, query: str = None):
-        if not self.events:
-            return {"message": "No events found"}
+    # =====================================================
+    # CREATE EVENT
+    # =====================================================
 
-        return {"events": self.events}
+    def create_event(
+        self,
+        query
+    ):
 
-    def delete(self, query: str = None):
-        if not self.events:
-            return {"message": "No events to delete"}
+        return (
+            "Calendar event creation is ready, "
+            "but natural-language date parsing "
+            "will be added next."
+        )
 
-        removed = self.events.pop()
+    # =====================================================
+    # SHOW EVENTS
+    # =====================================================
 
-        return {
-            "status": "deleted",
-            "event": removed
-        }
+    def show_events(self):
 
-    def execute_action(self, action: str, query: str):
+        events = (
+            self.calendar.get_all_events()
+        )
+
+        if not events:
+
+            return (
+                "You have no calendar events."
+            )
+
+        output = [
+            "📅 Your Calendar:"
+        ]
+
+        for event in events:
+
+            event_id = event[0]
+
+            title = event[1]
+
+            event_date = event[3]
+
+            event_time = event[4]
+
+            output.append(
+                f"{event_id}. "
+                f"{title} — "
+                f"{event_date} "
+                f"{event_time or ''}"
+            )
+
+        return "\n".join(output)
+
+    # =====================================================
+    # EXECUTE ACTION
+    # =====================================================
+
+    def execute_action(
+        self,
+        action,
+        query=None
+    ):
+
         if action == "create":
-            return self.create(query)
-        elif action == "view":
-            return self.view(query)
-        elif action == "delete":
-            return self.delete(query)
 
-        return {"error": f"Unknown action: {action}"}
+            return self.create_event(
+                query
+            )
+
+        if action in [
+            "list",
+            "show"
+        ]:
+
+            return self.show_events()
+
+        return (
+            f"Unknown calendar action: "
+            f"{action}"
+        )
+
+    # =====================================================
+    # TOOL MANAGER COMPATIBILITY
+    # =====================================================
+
+    def execute(self, query):
+
+        return self.create_event(
+            query
+        )
