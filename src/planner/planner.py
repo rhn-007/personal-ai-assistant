@@ -132,7 +132,7 @@ class Planner:
             ]
         ):
 
-            return [
+             plan.append(
                 {
                     "tool": "calendar",
                     "action": "create",
@@ -140,7 +140,7 @@ class Planner:
                         "query": query
                     }
                 }
-            ]
+             )
 
         # =====================================================
         # FALLBACK
