@@ -39,13 +39,13 @@ class Planner:
                 ]
             ):
 
-                plan.append(
+                plan.append[
                     {
                         "tool": "calendar",
                         "action": "list",
                         "input": {}
                     }
-                )
+                ]
 
             # CREATE EVENT
             else:
