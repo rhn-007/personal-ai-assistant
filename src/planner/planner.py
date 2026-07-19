@@ -10,120 +10,15 @@ class Planner:
 
         t = query.lower().strip()
 
-        # =====================================================
-        # SYSTEM / APP OPENING
-        # =====================================================
-
-        if any(
-            phrase in t
-            for phrase in [
-                "open ",
-                "launch ",
-                "start "
-            ]
-        ):
-
-            return [
-                {
-                    "tool": "system",
-                    "action": "open",
-                    "input": {
-                        "query": query
-                    }
-                }
-            ]
-
-        # =====================================================
-        # EMAIL INTENT
-        # =====================================================
-
-        if any(
-            k in t
-            for k in [
-                "email",
-                "mail",
-                "gmail",
-                "inbox"
-            ]
-        ):
-
-            if any(
-                k in t
-                for k in [
-                    "send",
-                    "compose",
-                    "write"
-                ]
-            ):
-
-                return [
-                    {
-                        "tool": "email",
-                        "action": "send",
-                        "input": {
-                            "raw": query
-                        }
-                    }
-                ]
-
-            if "from:" in t:
-
-                sender = (
-                    t.split("from:")[-1]
-                    .split()[0]
-                    .strip()
-                )
-
-                return [
-                    {
-                        "tool": "email",
-                        "action": "get_from",
-                        "input": {
-                            "sender": sender
-                        }
-                    }
-                ]
-
-            return [
-                {
-                    "tool": "email",
-                    "action": "get_unread",
-                    "input": {}
-                }
-            ]
-
-        # =====================================================
-        # SPOTIFY / MUSIC INTENT
-        # =====================================================
-
-        if any(
-            k in t
-            for k in [
-                "spotify",
-                "play",
-                "song",
-                "music",
-                "audio"
-            ]
-        ):
-
-            return [
-                {
-                    "tool": "spotify",
-                    "action": "play",
-                    "input": {
-                        "query": query
-                    }
-                }
-            ]
+        plan = []
 
         # =====================================================
         # CALENDAR INTENT
         # =====================================================
 
         if any(
-            k in t
-            for k in [
+            word in t
+            for word in [
                 "calendar",
                 "schedule",
                 "meeting",
@@ -132,26 +27,119 @@ class Planner:
             ]
         ):
 
-             plan.append(
+            # SHOW CALENDAR
+            if any(
+                word in t
+                for word in [
+                    "show",
+                    "list",
+                    "view",
+                    "what do i have",
+                    "what's on"
+                ]
+            ):
+
+                plan.append(
+                    {
+                        "tool": "calendar",
+                        "action": "list",
+                        "input": {}
+                    }
+                )
+
+            # CREATE EVENT
+            else:
+
+                plan.append(
+                    {
+                        "tool": "calendar",
+                        "action": "create",
+                        "input": {
+                            "query": query
+                        }
+                    }
+                )
+
+        # =====================================================
+        # SPOTIFY INTENT
+        # =====================================================
+
+        elif any(
+            word in t
+            for word in [
+                "spotify",
+                "play",
+                "song",
+                "music",
+                "audio"
+            ]
+        ):
+
+            plan.append(
                 {
-                    "tool": "calendar",
-                    "action": "create",
+                    "tool": "spotify",
+                    "action": "play",
                     "input": {
                         "query": query
                     }
                 }
-             )
+            )
+
+        # =====================================================
+        # SYSTEM INTENT
+        # =====================================================
+
+        elif any(
+            word in t
+            for word in [
+                "open",
+                "launch",
+                "start",
+                "folder",
+                "file"
+            ]
+        ):
+
+            plan.append(
+                {
+                    "tool": "system",
+                    "action": "open",
+                    "input": {
+                        "query": query
+                    }
+                }
+            )
+
+        # =====================================================
+        # EMAIL INTENT
+        # =====================================================
+
+        elif any(
+            word in t
+            for word in [
+                "email",
+                "mail",
+                "gmail",
+                "inbox"
+            ]
+        ):
+
+            plan.append(
+                {
+                    "tool": "email",
+                    "action": "default",
+                    "input": {
+                        "query": query
+                    }
+                }
+            )
 
         # =====================================================
         # FALLBACK
         # =====================================================
 
-        return [
-            {
-                "tool": "llm",
-                "action": "chat",
-                "input": {
-                    "query": query
-                }
-            }
-        ]
+        else:
+
+            return None
+
+        return plan
