@@ -10,6 +10,7 @@ from src.core.memory import MemoryManager
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 from src.utils.logger import setup_logger
+from src.tools.system_tool import SystemTool
 
 from src.tools.tool_manager import ToolManager
 from src.tools.email_tool import EmailTool
@@ -55,6 +56,7 @@ class PersonalAssistant:
         self.tool_manager.register(EmailTool())
         self.tool_manager.register(SpotifyTool())
         self.tool_manager.register(CalendarTool())
+        self.tool_manager.register(SystemTool())
 
         # ================= PLANNER =================
         self.planner = Planner(self.tool_manager)
