@@ -13,31 +13,18 @@ class SystemTool:
 
         self.name = "system"
 
-        logger.info(
-            "SystemTool initialized"
-        )
+        logger.info("SystemTool initialized")
 
     def open_target(self, query: str):
 
         if not query:
-
-            return (
-                "No application or folder specified."
-            )
+            return "No application or folder specified."
 
         q = query.lower().strip()
 
         # Remove common command words
-        for word in [
-            "open",
-            "launch",
-            "start"
-        ]:
-
-            q = q.replace(
-                word,
-                ""
-            ).strip()
+        for word in ["open", "launch", "start"]:
+            q = q.replace(word, "").strip()
 
         # =====================================================
         # APPLICATIONS
@@ -53,29 +40,25 @@ class SystemTool:
 
             "paint": "mspaint.exe",
 
-            "chrome": [
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+            # OPERA
+            "opera": [
+                r"C:\Users\%USERNAME%\AppData\Local\Programs\Opera\opera.exe",
+                r"C:\Program Files\Opera\launcher.exe",
+                r"C:\Program Files (x86)\Opera\launcher.exe"
             ],
 
-            "google chrome": [
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
-            ],
-
+            # SPOTIFY
             "spotify": [
 
-                os.path.expandvars(
-                    r"%APPDATA%\Spotify\Spotify.exe"
-                ),
+                r"C:\Users\%USERNAME%\AppData\Roaming\Spotify\Spotify.exe",
 
-                os.path.expandvars(
-                    r"%LOCALAPPDATA%\Spotify\Spotify.exe"
-                ),
+                r"C:\Users\%USERNAME%\AppData\Local\Spotify\Spotify.exe",
 
-                os.path.expandvars(
-                    r"%APPDATA%\Microsoft\Windows\Start Menu\Programs\Spotify.lnk"
-                )
+                r"C:\Program Files\Spotify\Spotify.exe",
+
+                r"C:\Program Files (x86)\Spotify\Spotify.exe",
+
+                r"C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Spotify.lnk"
 
             ]
 
@@ -85,48 +68,56 @@ class SystemTool:
 
             try:
 
-                app = apps[q]
+                app_paths = apps[q]
 
                 # =================================================
                 # MULTIPLE POSSIBLE PATHS
                 # =================================================
 
-                if isinstance(app, list):
+                if isinstance(app_paths, list):
 
-                    for path in app:
+                    for path in app_paths:
+
+                        # Expand %USERNAME% and environment variables
+                        path = os.path.expandvars(path)
 
                         if os.path.exists(path):
 
-                            os.startfile(path)
+                            if path.lower().endswith(".lnk"):
+
+                                os.startfile(path)
+
+                            else:
+
+                                subprocess.Popen([path])
 
                             logger.info(
                                 f"Opened {q}: {path}"
                             )
 
-                            return (
-                                f"Opened {q}."
-                            )
+                            return f"Opened {q}."
 
-                    # Spotify URI fallback
+                    # =================================================
+                    # SPOTIFY URI FALLBACK
+                    # =================================================
+
                     if q == "spotify":
 
                         try:
 
-                            os.startfile(
-                                "spotify:"
-                            )
+                            os.startfile("spotify:")
 
                             logger.info(
-                                "Opened Spotify using URI"
+                                "Opened Spotify using spotify URI"
                             )
 
-                            return (
-                                "Opened Spotify."
+                            return "Opened spotify."
+
+                        except Exception as e:
+
+                            logger.error(
+                                f"Spotify URI failed: {e}"
                             )
-
-                        except Exception:
-
-                            pass
 
                     return (
                         f"Could not find the installed "
@@ -134,32 +125,16 @@ class SystemTool:
                     )
 
                 # =================================================
-                # URI
+                # NORMAL EXECUTABLE
                 # =================================================
 
-                if isinstance(app, str) and app.endswith(":"):
-
-                    os.startfile(app)
-
-                    return (
-                        f"Opened {q}."
-                    )
-
-                # =================================================
-                # EXECUTABLE
-                # =================================================
-
-                subprocess.Popen(
-                    [app]
-                )
+                subprocess.Popen([app_paths])
 
                 logger.info(
                     f"Opened application: {q}"
                 )
 
-                return (
-                    f"Opened {q}."
-                )
+                return f"Opened {q}."
 
             except Exception as e:
 
@@ -198,17 +173,13 @@ class SystemTool:
 
             try:
 
-                os.startfile(
-                    folders[q]
-                )
+                os.startfile(folders[q])
 
                 logger.info(
                     f"Opened folder: {q}"
                 )
 
-                return (
-                    f"Opened {q}."
-                )
+                return f"Opened {q}."
 
             except Exception as e:
 
@@ -233,20 +204,13 @@ class SystemTool:
 
         if action == "open":
 
-            return self.open_target(
-                query
-            )
+            return self.open_target(query)
 
         return (
             f"Unknown system action: "
             f"{action}"
         )
 
-    def execute(
-        self,
-        query: str
-    ):
+    def execute(self, query: str):
 
-        return self.open_target(
-            query
-        )
+        return self.open_target(query)
