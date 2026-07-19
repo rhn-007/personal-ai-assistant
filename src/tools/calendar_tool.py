@@ -71,7 +71,10 @@ class CalendarTool:
 
         today = datetime.now().date()
 
-        if "tomorrow" in text:
+        if (
+            "tomorrow" in text
+            or "tmrw" in text
+        ):
 
             event_date = (
                 today + timedelta(days=1)
@@ -79,11 +82,15 @@ class CalendarTool:
 
         elif "today" in text:
 
-            event_date = today.isoformat()
+            event_date = (
+                today.isoformat()
+            )
 
         else:
 
-            event_date = today.isoformat()
+            event_date = (
+                today.isoformat()
+            )
 
         # -----------------------------
         # CLEAN TITLE
@@ -111,7 +118,11 @@ class CalendarTool:
 
             "today",
 
-            "tomorrow"
+            "tomorrow",
+
+            "tmrw",
+
+            "for"
         ]
 
         for phrase in phrases_to_remove:
@@ -121,7 +132,10 @@ class CalendarTool:
                 ""
             )
 
-        # Remove time
+        # -----------------------------
+        # REMOVE TIME
+        # -----------------------------
+
         if time_match:
 
             title = title.replace(
@@ -129,23 +143,28 @@ class CalendarTool:
                 ""
             )
 
-        title = title.strip()
+        # -----------------------------
+        # CLEAN EXTRA SPACES
+        # -----------------------------
 
-        # Clean extra spaces
         title = re.sub(
             r"\s+",
             " ",
             title
-        )
+        ).strip()
 
         if not title:
 
             title = "Reminder"
 
         return {
+
             "title": title.title(),
+
             "date": event_date,
+
             "time": event_time
+
         }
 
     # =====================================================
@@ -172,6 +191,7 @@ class CalendarTool:
             event_date=event["date"],
 
             event_time=event["time"]
+
         )
 
         return (
@@ -182,7 +202,9 @@ class CalendarTool:
 
             f"Date: {created['date']}\n"
 
-            f"Time: {created['time'] or 'Any time'}"
+            f"Time: "
+            f"{created['time'] or 'Any time'}"
+
         )
 
     # =====================================================
@@ -202,7 +224,9 @@ class CalendarTool:
             )
 
         output = [
+
             "📅 Your Calendar:"
+
         ]
 
         for event in events:
@@ -221,6 +245,7 @@ class CalendarTool:
                 f"{title} — "
                 f"{event_date} "
                 f"{event_time or ''}"
+
             )
 
         return "\n".join(
@@ -228,13 +253,40 @@ class CalendarTool:
         )
 
     # =====================================================
+    # DELETE LATEST EVENT
+    # =====================================================
+
+    def delete_event(self):
+
+        event = (
+            self.calendar.delete_latest_event()
+        )
+
+        if not event:
+
+            return (
+                "There are no events to delete."
+            )
+
+        return (
+
+            f"🗑️ Deleted event: "
+            f"{event['title']}"
+
+        )
+
+    # =====================================================
     # EXECUTE ACTION
     # =====================================================
 
     def execute_action(
+
         self,
+
         action,
+
         query=None
+
     ):
 
         if action == "create":
@@ -244,16 +296,24 @@ class CalendarTool:
             )
 
         if action in [
+
             "list",
+
             "show"
+
         ]:
 
             return self.show_events()
+
+        if action == "delete":
+
+            return self.delete_event()
 
         return (
 
             f"Unknown calendar action: "
             f"{action}"
+
         )
 
     # =====================================================
