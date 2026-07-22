@@ -1,3 +1,4 @@
+import re
 import webbrowser
 from urllib.parse import quote
 
@@ -82,10 +83,19 @@ class BrowserTool:
 
         ]:
 
-            target = target.replace(
-                phrase,
-                ""
-            ).strip()
+            if target.startswith(
+                phrase
+            ):
+
+                target = target[
+                    len(phrase):
+                ].strip()
+
+                break
+
+        # ---------------------------------------------
+        # OPEN KNOWN WEBSITE
+        # ---------------------------------------------
 
         if target in websites:
 
@@ -98,8 +108,13 @@ class BrowserTool:
             )
 
             return (
-                f"🌐 Opened {target.title()}."
+                f"🌐 Opened "
+                f"{target.title()}."
             )
+
+        # ---------------------------------------------
+        # OPEN DIRECT URL
+        # ---------------------------------------------
 
         if (
 
@@ -115,9 +130,17 @@ class BrowserTool:
 
             webbrowser.open(target)
 
+            logger.info(
+                f"Opened URL: {target}"
+            )
+
             return (
                 f"🌐 Opened {target}."
             )
+
+        # ---------------------------------------------
+        # UNKNOWN TARGET → SEARCH
+        # ---------------------------------------------
 
         return self.search_web(
             target
@@ -130,223 +153,298 @@ class BrowserTool:
     def search_web(self, query):
 
         if not query:
-    
+
             return (
                 "No search query specified."
             )
-    
-        search_query = query.lower().strip()
-    
-        # Remove command phrases
+
+        search_query = (
+            query.lower().strip()
+        )
+
         phrases_to_remove = [
-    
+
             "search for",
-    
+
             "search",
-    
+
             "look up",
-    
+
             "find online",
-    
+
             "google"
-    
+
         ]
-    
+
         for phrase in phrases_to_remove:
-    
+
             if search_query.startswith(
                 phrase
             ):
-    
+
                 search_query = (
-    
+
                     search_query[
                         len(phrase):
                     ]
-    
+
                     .strip()
-    
+
                 )
-    
+
                 break
-    
+
         if not search_query:
-    
+
             return (
+
                 "Please specify what you "
                 "want me to search for."
+
             )
-    
+
         search_url = (
-    
+
             "https://www.google.com/search?q="
-    
+
             + quote(search_query)
-    
+
         )
-    
+
         webbrowser.open(
             search_url
         )
-    
+
         logger.info(
-    
+
             f"Performed web search: "
             f"{search_query}"
-    
+
         )
-    
+
         return (
-    
+
             f"🔎 Searching the web for "
             f"'{search_query}'."
-    
+
         )
 
     # =====================================================
     # READ WEB PAGE
     # =====================================================
-    
+
     def read_webpage(self, url):
-    
+
         if not url:
-    
+
             return (
+
                 "No webpage URL specified."
+
             )
-    
-        if not (
-    
-            url.startswith(
-                "http://"
+
+        url = url.strip()
+
+        # ---------------------------------------------
+        # EXTRACT URL FROM COMMAND
+        # ---------------------------------------------
+
+        url_match = re.search(
+
+            r"https?://\S+",
+
+            url
+
+        )
+
+        if url_match:
+
+            url = url_match.group(
+                0
             )
-    
-            or url.startswith(
-                "https://"
+
+        else:
+
+            prefixes = [
+
+                "read this webpage",
+
+                "read this website",
+
+                "read webpage",
+
+                "read website",
+
+                "read"
+
+            ]
+
+            lower_url = (
+                url.lower()
             )
-    
-        ):
-    
-            url = (
-                "https://"
-                + url
-            )
-    
-        try:
-    
-            response = requests.get(
-    
-                url,
-    
-                timeout=10,
-    
-                headers={
-    
-                    "User-Agent":
-                    "Mozilla/5.0"
-    
-                }
-    
-            )
-    
-            response.raise_for_status()
-    
-            soup = BeautifulSoup(
-    
-                response.text,
-    
-                "html.parser"
-    
-            )
-    
-            # Remove non-content elements
-    
-            for element in soup(
-    
-                [
-    
-                    "script",
-    
-                    "style",
-    
-                    "nav",
-    
-                    "footer",
-    
-                    "header"
-    
-                ]
-    
+
+            for prefix in prefixes:
+
+                if lower_url.startswith(
+                    prefix
+                ):
+
+                    url = url[
+                        len(prefix):
+                    ].strip()
+
+                    break
+
+            if not (
+
+                url.startswith(
+                    "http://"
+                )
+
+                or url.startswith(
+                    "https://"
+                )
+
             ):
-    
-                element.decompose()
-    
-            text = soup.get_text(
-    
-                separator=" ",
-    
-                strip=True
-    
+
+                url = (
+
+                    "https://"
+
+                    + url
+
+                )
+
+        try:
+
+            response = requests.get(
+
+                url,
+
+                timeout=10,
+
+                headers={
+
+                    "User-Agent":
+
+                    "Mozilla/5.0"
+
+                }
+
             )
-    
+
+            response.raise_for_status()
+
+            soup = BeautifulSoup(
+
+                response.text,
+
+                "html.parser"
+
+            )
+
+            # ---------------------------------------------
+            # REMOVE NON-CONTENT ELEMENTS
+            # ---------------------------------------------
+
+            for element in soup(
+
+                [
+
+                    "script",
+
+                    "style",
+
+                    "nav",
+
+                    "footer",
+
+                    "header",
+
+                    "aside",
+
+                    "form"
+
+                ]
+
+            ):
+
+                element.decompose()
+
+            # ---------------------------------------------
+            # EXTRACT TEXT
+            # ---------------------------------------------
+
+            text = soup.get_text(
+
+                separator=" ",
+
+                strip=True
+
+            )
+
             if not text:
-    
+
                 return (
-    
+
                     "Could not extract text "
                     "from this webpage."
-    
+
                 )
-    
-            # Limit output size
-    
+
+            # ---------------------------------------------
+            # LIMIT OUTPUT SIZE
+            # ---------------------------------------------
+
             text = text[:5000]
-    
+
             logger.info(
-    
+
                 f"Successfully read webpage: "
                 f"{url}"
-    
+
             )
-    
+
             return (
-    
+
                 f"📄 Webpage content:\n\n"
-    
+
                 f"{text}"
-    
+
             )
-    
+
         except requests.RequestException as e:
-    
+
             logger.error(
-    
+
                 f"Failed to read webpage "
                 f"{url}: {e}"
-    
+
             )
-    
+
             return (
-    
+
                 f"❌ Could not access webpage: "
                 f"{e}"
-    
+
             )
-    
+
         except Exception as e:
-    
+
             logger.error(
-    
-                f"Webpage reading error: {e}"
-    
+
+                f"Webpage reading error: "
+                f"{e}"
+
             )
-    
+
             return (
-    
+
                 f"❌ Error reading webpage: "
                 f"{e}"
-    
+
             )
+
     # =====================================================
     # EXECUTE ACTION
     # =====================================================
@@ -367,15 +465,15 @@ class BrowserTool:
                 query
             )
 
-        if action == "read":
-
-            return self.read_webpage(
-                query
-            )
-
         if action == "search":
 
             return self.search_web(
+                query
+            )
+
+        if action == "read":
+
+            return self.read_webpage(
                 query
             )
 
