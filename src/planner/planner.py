@@ -203,6 +203,10 @@ class Planner:
 
                 or "read search result" in t
 
+                or "summarize result" in t
+
+                or "summarize search result" in t
+
             )
 
             and any(
@@ -214,6 +218,10 @@ class Planner:
             )
 
         ):
+
+            # ---------------------------------------------
+            # EXTRACT RESULT NUMBER
+            # ---------------------------------------------
 
             number_match = re.search(
 
@@ -234,10 +242,40 @@ class Planner:
             )
 
             # ---------------------------------------------
-            # READ RESULT
+            # SUMMARIZE RESULT
             # ---------------------------------------------
 
             if (
+
+                "summarize result" in t
+
+                or "summarize search result" in t
+
+            ):
+
+                plan.append(
+
+                    {
+
+                        "tool": "browser",
+
+                        "action": "summarize_result",
+
+                        "input": {
+
+                            "query": result_number
+
+                        }
+
+                    }
+
+                )
+
+            # ---------------------------------------------
+            # READ RESULT
+            # ---------------------------------------------
+
+            elif (
 
                 "read result" in t
 
@@ -288,6 +326,53 @@ class Planner:
                 )
 
         # =====================================================
+        # BROWSER SUMMARIZE INTENT
+        # IMPORTANT: MUST COME BEFORE READ INTENT
+        # =====================================================
+
+        elif (
+
+            t.startswith("summarize ")
+
+            or t.startswith("summarise ")
+
+            or t.startswith("summarize this webpage")
+
+            or t.startswith("summarize this website")
+
+            or t.startswith("summarize webpage")
+
+            or t.startswith("summarize website")
+
+            or t.startswith("summarise this webpage")
+
+            or t.startswith("summarise this website")
+
+            or t.startswith("summarise webpage")
+
+            or t.startswith("summarise website")
+
+        ):
+
+            plan.append(
+
+                {
+
+                    "tool": "browser",
+
+                    "action": "summarize",
+
+                    "input": {
+
+                        "query": query
+
+                    }
+
+                }
+
+            )
+
+        # =====================================================
         # BROWSER READ INTENT
         # =====================================================
 
@@ -317,9 +402,7 @@ class Planner:
 
                         "read",
 
-                        "extract",
-
-                        "summarize"
+                        "extract"
 
                     ]
 
