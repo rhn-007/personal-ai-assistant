@@ -58,7 +58,7 @@ class PersonalAssistant:
         self.tool_manager.register(SpotifyTool())
         self.tool_manager.register(CalendarTool())
         self.tool_manager.register(SystemTool())
-        self.tool_manager.register(BrowserTool())
+        self.tool_manager.register(BrowserTool(llm=self.llm))
 
         # ================= PLANNER =================
         self.planner = Planner(self.tool_manager)
