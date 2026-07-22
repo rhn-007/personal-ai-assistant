@@ -165,9 +165,11 @@ class PersonalAssistant:
         # =====================================================
 
         self.planner = Planner(
-
             self.tool_manager
-
+        )
+        
+        self.tool_manager.set_planner(
+            self.planner
         )
 
         # =====================================================
