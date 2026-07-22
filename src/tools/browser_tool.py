@@ -127,37 +127,78 @@ class BrowserTool:
     def search_web(self, query):
 
         if not query:
-
+    
             return (
                 "No search query specified."
             )
-
+    
+        search_query = query.lower().strip()
+    
+        # Remove command phrases
+        phrases_to_remove = [
+    
+            "search for",
+    
+            "search",
+    
+            "look up",
+    
+            "find online",
+    
+            "google"
+    
+        ]
+    
+        for phrase in phrases_to_remove:
+    
+            if search_query.startswith(
+                phrase
+            ):
+    
+                search_query = (
+    
+                    search_query[
+                        len(phrase):
+                    ]
+    
+                    .strip()
+    
+                )
+    
+                break
+    
+        if not search_query:
+    
+            return (
+                "Please specify what you "
+                "want me to search for."
+            )
+    
         search_url = (
-
+    
             "https://www.google.com/search?q="
-
-            + quote(query)
-
+    
+            + quote(search_query)
+    
         )
-
+    
         webbrowser.open(
             search_url
         )
-
+    
         logger.info(
-
+    
             f"Performed web search: "
-            f"{query}"
-
+            f"{search_query}"
+    
         )
-
+    
         return (
-
+    
             f"🔎 Searching the web for "
-            f"'{query}'."
-
+            f"'{search_query}'."
+    
         )
-
     # =====================================================
     # EXECUTE ACTION
     # =====================================================
