@@ -1332,7 +1332,7 @@ ORIGINAL WEBPAGE CONTENT:
 
             logger.info(
 
-                "Generating expanded summary "
+                "Generating updated summary "
                 "of last webpage..."
 
             )
@@ -1348,7 +1348,7 @@ ORIGINAL WEBPAGE CONTENT:
                 return (
 
                     "❌ Could not generate "
-                    "an expanded summary."
+                    "an updated summary."
 
                 )
 
@@ -1356,7 +1356,7 @@ ORIGINAL WEBPAGE CONTENT:
 
             return (
 
-                f"📝 Expanded Summary "
+                f"📝 Updated Summary "
                 f"(approximately {word_count} words):\n\n"
 
                 + summary
@@ -1367,7 +1367,7 @@ ORIGINAL WEBPAGE CONTENT:
 
             logger.error(
 
-                f"Expanded summary failed: "
+                f"Updated summary failed: "
                 f"{e}"
 
             )
@@ -1375,7 +1375,7 @@ ORIGINAL WEBPAGE CONTENT:
             return (
 
                 f"❌ Error generating "
-                f"expanded summary: {e}"
+                f"updated summary: {e}"
 
             )
 
