@@ -108,9 +108,7 @@ class BrowserTool:
 
             url = websites[target]
 
-            webbrowser.open(
-                url
-            )
+            webbrowser.open(url)
 
             logger.info(
                 f"Opened website: {target}"
@@ -139,9 +137,7 @@ class BrowserTool:
 
         ):
 
-            webbrowser.open(
-                target
-            )
+            webbrowser.open(target)
 
             logger.info(
                 f"Opened URL: {target}"
@@ -373,8 +369,6 @@ class BrowserTool:
 
                 )
 
-                # Keep maximum 10 results
-
                 if len(results) >= 10:
 
                     break
@@ -424,19 +418,14 @@ class BrowserTool:
                 output.append(
 
                     "\nYou can say "
-                    "'open result 1', "
-                    "'read result 2', or "
-                    "'summarize result 3'."
+                    "'open result 1' or "
+                    "'read result 2'."
 
                 )
 
                 return "\n".join(
                     output
                 )
-
-            # -----------------------------------------
-            # FALLBACK
-            # -----------------------------------------
 
             return (
 
@@ -616,94 +605,26 @@ class BrowserTool:
         )
 
     # =====================================================
-    # SUMMARIZE SEARCH RESULT
+    # EXTRACT URL FROM QUERY
     # =====================================================
 
-    def summarize_result(self, number):
+    def extract_url(self, query):
 
-        if not self.last_search_results:
+        if not query:
 
-            return (
+            return None
 
-                "There are no recent search "
-                "results."
-
-            )
-
-        try:
-
-            index = int(number) - 1
-
-        except ValueError:
-
-            return (
-
-                "Please specify a valid result "
-                "number."
-
-            )
-
-        if (
-
-            index < 0
-
-            or index >= len(
-                self.last_search_results
-            )
-
-        ):
-
-            return (
-
-                "That search result does "
-                "not exist."
-
-            )
-
-        result = (
-
-            self.last_search_results[
-                index
-            ]
-
-        )
-
-        logger.info(
-
-            f"Summarizing search result "
-            f"{number}: {result['url']}"
-
-        )
-
-        return self.summarize_webpage(
-            result["url"]
-        )
-
-    # =====================================================
-    # READ WEB PAGE
-    # =====================================================
-
-    def read_webpage(self, url):
-
-        if not url:
-
-            return (
-
-                "No webpage URL specified."
-
-            )
-
-        url = url.strip()
+        query = query.strip()
 
         # ---------------------------------------------
-        # EXTRACT URL FROM COMMAND
+        # EXTRACT COMPLETE URL
         # ---------------------------------------------
 
         url_match = re.search(
 
             r"https?://\S+",
 
-            url
+            query
 
         )
 
@@ -713,63 +634,126 @@ class BrowserTool:
                 0
             )
 
-            # Remove trailing punctuation
+            # Remove only punctuation that is unlikely
+            # to be part of a URL.
+            #
+            # IMPORTANT:
+            # Do NOT remove ")" because valid URLs can
+            # contain parentheses, such as:
+            #
+            # https://en.wikipedia.org/wiki/
+            # Superstore_(TV_series)
 
             url = url.rstrip(
-                ".,!?;)"
+                ".,!?;"
             )
 
-        else:
+            return url
 
-            prefixes = [
+        # ---------------------------------------------
+        # REMOVE COMMAND PHRASES
+        # ---------------------------------------------
 
-                "read this webpage",
+        prefixes = [
 
-                "read this website",
+            "read this webpage",
 
-                "read webpage",
+            "read this website",
 
-                "read website",
+            "read webpage",
 
-                "read"
+            "read website",
 
-            ]
+            "summarize this webpage",
 
-            lower_url = (
-                url.lower()
-            )
+            "summarize this website",
 
-            for prefix in prefixes:
+            "summarize webpage",
 
-                if lower_url.startswith(
-                    prefix
-                ):
+            "summarize website",
 
-                    url = url[
-                        len(prefix):
-                    ].strip()
+            "summarize",
 
-                    break
+            "summarise this webpage",
 
-            if not (
+            "summarise this website",
 
-                url.startswith(
-                    "http://"
-                )
+            "summarise webpage",
 
-                or url.startswith(
-                    "https://"
-                )
+            "summarise website",
 
+            "summarise",
+
+            "read"
+
+        ]
+
+        lower_query = query.lower()
+
+        for prefix in prefixes:
+
+            if lower_query.startswith(
+                prefix
             ):
 
-                url = (
+                query = query[
+                    len(prefix):
+                ].strip()
 
-                    "https://"
+                break
 
-                    + url
+        if not query:
 
-                )
+            return None
+
+        if not (
+
+            query.startswith(
+                "http://"
+            )
+
+            or query.startswith(
+                "https://"
+            )
+
+        ):
+
+            query = (
+
+                "https://"
+
+                + query
+
+            )
+
+        return query
+
+    # =====================================================
+    # READ WEB PAGE
+    # =====================================================
+
+    def read_webpage(self, query):
+
+        if not query:
+
+            return (
+
+                "No webpage URL specified."
+
+            )
+
+        url = self.extract_url(
+            query
+        )
+
+        if not url:
+
+            return (
+
+                "Please provide a valid "
+                "webpage URL."
+
+            )
 
         try:
 
@@ -910,7 +894,7 @@ class BrowserTool:
                 previous = paragraph
 
             # ---------------------------------------------
-            # JOIN WITH PARAGRAPH SPACING
+            # JOIN CONTENT
             # ---------------------------------------------
 
             text = "\n\n".join(
@@ -982,12 +966,12 @@ class BrowserTool:
             )
 
     # =====================================================
-    # SUMMARIZE WEB PAGE
+    # SUMMARIZE WEBPAGE
     # =====================================================
 
-    def summarize_webpage(self, url):
+    def summarize_webpage(self, query):
 
-        if not url:
+        if not query:
 
             return (
 
@@ -995,558 +979,116 @@ class BrowserTool:
 
             )
 
-        url = url.strip()
-
         # ---------------------------------------------
-        # EXTRACT URL FROM COMMAND
+        # EXTRACT URL
         # ---------------------------------------------
 
-        url_match = re.search(
+        url = self.extract_url(
+            query
+        )
 
-            r"https?://\S+",
+        if not url:
 
+            return (
+
+                "Please provide a valid "
+                "webpage URL."
+
+            )
+
+        # ---------------------------------------------
+        # READ WEBPAGE
+        # ---------------------------------------------
+
+        content = self.read_webpage(
             url
+        )
+
+        if content.startswith(
+            "❌"
+        ):
+
+            return content
+
+        if content.startswith(
+            "Could not"
+        ):
+
+            return content
+
+        # ---------------------------------------------
+        # REMOVE OUTPUT LABEL
+        # ---------------------------------------------
+
+        webpage_text = content.replace(
+
+            "📄 Webpage content:\n\n",
+
+            "",
+
+            1
 
         )
 
-        if url_match:
+        # ---------------------------------------------
+        # SPLIT INTO SENTENCES
+        # ---------------------------------------------
 
-            url = url_match.group(
-                0
-            )
+        sentences = re.split(
 
-            url = url.rstrip(
-                ".,!?;)"
-            )
+            r"(?<=[.!?])\s+",
 
-        else:
+            webpage_text
 
-            prefixes = [
+        )
 
-                "summarize this webpage",
+        sentences = [
 
-                "summarize this website",
+            sentence.strip()
 
-                "summarize webpage",
+            for sentence in sentences
 
-                "summarize website",
+            if len(
+                sentence.strip()
+            ) > 40
 
-                "summarize"
+        ]
 
-            ]
+        # ---------------------------------------------
+        # SELECT MAIN SENTENCES
+        # ---------------------------------------------
 
-            lower_url = (
-                url.lower()
-            )
+        summary_sentences = sentences[:8]
 
-            for prefix in prefixes:
-
-                if lower_url.startswith(
-                    prefix
-                ):
-
-                    url = url[
-                        len(prefix):
-                    ].strip()
-
-                    break
-
-            if not (
-
-                url.startswith(
-                    "http://"
-                )
-
-                or url.startswith(
-                    "https://"
-                )
-
-            ):
-
-                url = (
-
-                    "https://"
-
-                    + url
-
-                )
-
-        try:
-
-            response = requests.get(
-
-                url,
-
-                timeout=10,
-
-                headers={
-
-                    "User-Agent":
-
-                    "Mozilla/5.0"
-
-                }
-
-            )
-
-            response.raise_for_status()
-
-            soup = BeautifulSoup(
-
-                response.text,
-
-                "html.parser"
-
-            )
-
-            # ---------------------------------------------
-            # REMOVE NON-CONTENT ELEMENTS
-            # ---------------------------------------------
-
-            for element in soup(
-
-                [
-
-                    "script",
-
-                    "style",
-
-                    "nav",
-
-                    "footer",
-
-                    "header",
-
-                    "aside",
-
-                    "form",
-
-                    "noscript",
-
-                    "iframe"
-
-                ]
-
-            ):
-
-                element.decompose()
-
-            # ---------------------------------------------
-            # EXTRACT CONTENT
-            # ---------------------------------------------
-
-            paragraphs = []
-
-            for element in soup.find_all(
-
-                [
-
-                    "h1",
-
-                    "h2",
-
-                    "h3",
-
-                    "h4",
-
-                    "p"
-
-                ]
-
-            ):
-
-                content = element.get_text(
-
-                    " ",
-
-                    strip=True
-
-                )
-
-                if not content:
-
-                    continue
-
-                # Ignore very short text
-
-                if len(content) < 40:
-
-                    continue
-
-                paragraphs.append(
-                    content
-                )
-
-            # ---------------------------------------------
-            # REMOVE DUPLICATE PARAGRAPHS
-            # ---------------------------------------------
-
-            cleaned_paragraphs = []
-
-            seen = set()
-
-            for paragraph in paragraphs:
-
-                normalized = re.sub(
-
-                    r"\s+",
-
-                    " ",
-
-                    paragraph.lower()
-
-                ).strip()
-
-                if normalized in seen:
-
-                    continue
-
-                seen.add(
-                    normalized
-                )
-
-                cleaned_paragraphs.append(
-                    paragraph
-                )
-
-            paragraphs = cleaned_paragraphs
-
-            if not paragraphs:
-
-                return (
-
-                    "Could not find enough readable "
-                    "content to summarize."
-
-                )
-
-            # ---------------------------------------------
-            # CREATE SENTENCES
-            # ---------------------------------------------
-
-            sentences = []
-
-            for paragraph in paragraphs:
-
-                paragraph_sentences = re.split(
-
-                    r"(?<=[.!?])\s+",
-
-                    paragraph
-
-                )
-
-                for sentence in paragraph_sentences:
-
-                    sentence = sentence.strip()
-
-                    if len(sentence) >= 40:
-
-                        sentences.append(
-                            sentence
-                        )
-
-            if not sentences:
-
-                return (
-
-                    "Could not find enough readable "
-                    "sentences to summarize."
-
-                )
-
-            # ---------------------------------------------
-            # WORD FREQUENCY ANALYSIS
-            # ---------------------------------------------
-
-            words = re.findall(
-
-                r"\b[a-zA-Z]{3,}\b",
-
-                " ".join(sentences).lower()
-
-            )
-
-            stop_words = {
-
-                "the",
-
-                "and",
-
-                "that",
-
-                "this",
-
-                "with",
-
-                "from",
-
-                "they",
-
-                "their",
-
-                "there",
-
-                "which",
-
-                "were",
-
-                "have",
-
-                "has",
-
-                "been",
-
-                "will",
-
-                "would",
-
-                "could",
-
-                "about",
-
-                "into",
-
-                "than",
-
-                "then",
-
-                "also",
-
-                "more",
-
-                "some",
-
-                "such",
-
-                "what",
-
-                "when",
-
-                "where",
-
-                "while",
-
-                "your",
-
-                "you",
-
-                "for",
-
-                "are",
-
-                "was",
-
-                "but",
-
-                "not",
-
-                "its",
-
-                "our",
-
-                "how",
-
-                "all",
-
-                "can",
-
-                "may",
-
-                "one",
-
-                "two"
-
-            }
-
-            word_frequency = {}
-
-            for word in words:
-
-                if word in stop_words:
-
-                    continue
-
-                word_frequency[word] = (
-
-                    word_frequency.get(
-                        word,
-                        0
-                    )
-
-                    + 1
-
-                )
-
-            # ---------------------------------------------
-            # SCORE SENTENCES
-            # ---------------------------------------------
-
-            scored_sentences = []
-
-            for position, sentence in enumerate(
-
-                sentences
-
-            ):
-
-                sentence_words = re.findall(
-
-                    r"\b[a-zA-Z]{3,}\b",
-
-                    sentence.lower()
-
-                )
-
-                if not sentence_words:
-
-                    continue
-
-                score = 0
-
-                for word in sentence_words:
-
-                    score += (
-
-                        word_frequency.get(
-                            word,
-                            0
-                        )
-
-                    )
-
-                # Give a small bonus to earlier sentences
-
-                position_bonus = (
-
-                    max(
-
-                        0,
-
-                        10 - position
-
-                    )
-
-                    * 0.5
-
-                )
-
-                score += position_bonus
-
-                scored_sentences.append(
-
-                    {
-
-                        "sentence": sentence,
-
-                        "score": score,
-
-                        "position": position
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # SELECT TOP SENTENCES
-            # ---------------------------------------------
-
-            summary_length = min(
-
-                8,
-
-                max(
-
-                    3,
-
-                    len(sentences) // 8
-
-                )
-
-            )
-
-            selected = sorted(
-
-                scored_sentences,
-
-                key=lambda item:
-                item["score"],
-
-                reverse=True
-
-            )[
-
-                :summary_length
-
-            ]
-
-            # ---------------------------------------------
-            # RESTORE ORIGINAL ORDER
-            # ---------------------------------------------
-
-            selected = sorted(
-
-                selected,
-
-                key=lambda item:
-                item["position"]
-
-            )
-
-            summary = " ".join(
-
-                item["sentence"]
-
-                for item in selected
-
-            )
-
-            logger.info(
-
-                f"Successfully summarized webpage: "
-                f"{url}"
-
-            )
+        if not summary_sentences:
 
             return (
 
-                f"📝 Webpage summary:\n\n"
-
-                f"{summary}"
-
-            )
-
-        except requests.RequestException as e:
-
-            logger.error(
-
-                f"Failed to summarize webpage "
-                f"{url}: {e}"
+                "Could not generate a "
+                "summary for this webpage."
 
             )
 
-            return (
+        summary = " ".join(
 
-                f"❌ Could not access webpage: "
-                f"{e}"
+            summary_sentences
 
-            )
+        )
 
-        except Exception as e:
+        logger.info(
 
-            logger.error(
+            f"Successfully summarized webpage: "
+            f"{url}"
 
-                f"Webpage summarization error: "
-                f"{e}"
+        )
 
-            )
+        return (
 
-            return (
+            f"📝 Summary:\n\n"
 
-                f"❌ Error summarizing webpage: "
-                f"{e}"
+            f"{summary}"
 
-            )
+        )
 
     # =====================================================
     # EXECUTE ACTION
@@ -1593,6 +1135,16 @@ class BrowserTool:
             )
 
         # ---------------------------------------------
+        # SUMMARIZE WEBPAGE
+        # ---------------------------------------------
+
+        if action == "summarize":
+
+            return self.summarize_webpage(
+                query
+            )
+
+        # ---------------------------------------------
         # OPEN SEARCH RESULT
         # ---------------------------------------------
 
@@ -1609,26 +1161,6 @@ class BrowserTool:
         if action == "read_result":
 
             return self.read_result(
-                query
-            )
-
-        # ---------------------------------------------
-        # SUMMARIZE WEBPAGE
-        # ---------------------------------------------
-
-        if action == "summarize":
-
-            return self.summarize_webpage(
-                query
-            )
-
-        # ---------------------------------------------
-        # SUMMARIZE SEARCH RESULT
-        # ---------------------------------------------
-
-        if action == "summarize_result":
-
-            return self.summarize_result(
                 query
             )
 
