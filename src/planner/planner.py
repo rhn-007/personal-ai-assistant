@@ -230,23 +230,29 @@ class Planner:
         # BROWSER READ INTENT
         # =====================================================
         
-        elif any(
+        elif (
         
-            phrase in t
+            t.startswith("read ")
         
-            for phrase in [
+            or any(
         
-                "read this webpage",
+                phrase in t
         
-                "read this website",
+                for phrase in [
         
-                "read webpage",
+                    "read this webpage",
         
-                "read website",
+                    "read this website",
         
-                "extract text from"
+                    "read webpage",
         
-            ]
+                    "read website",
+        
+                    "extract text from"
+        
+                ]
+        
+            )
         
         ):
         
