@@ -187,6 +187,70 @@ class CalendarIntegration:
         return rows
 
     # =====================================================
+    # DELETE EVENT BY TITLE
+    # =====================================================
+
+    def delete_event_by_title(self, title):
+
+        if not title:
+
+            return None
+
+        connection = self._connect()
+
+        cursor = connection.cursor()
+
+        # Find the most recently created matching event
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title
+
+            FROM events
+
+            WHERE LOWER(title) LIKE LOWER(?)
+
+            ORDER BY id DESC
+
+            LIMIT 1
+            """,
+
+            (f"%{title}%",)
+        )
+
+        event = cursor.fetchone()
+
+        if not event:
+
+            connection.close()
+
+            return None
+
+        event_id = event[0]
+
+        event_title = event[1]
+
+        cursor.execute(
+            """
+            DELETE FROM events
+
+            WHERE id = ?
+            """,
+
+            (event_id,)
+        )
+
+        connection.commit()
+
+        connection.close()
+
+        return {
+            "id": event_id,
+            "title": event_title
+        }
+
+    # =====================================================
     # DELETE LATEST EVENT
     # =====================================================
 
