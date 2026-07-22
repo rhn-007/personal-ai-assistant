@@ -13,9 +13,12 @@ logger = setup_logger(__name__)
 
 class BrowserTool:
 
-    def __init__(self):
+    def __init__(self, llm=None):
 
         self.name = "browser"
+
+        # Ollama LLM integration
+        self.llm = llm
 
         # Stores the most recent search results
         self.last_search_results = []
@@ -639,10 +642,7 @@ class BrowserTool:
             #
             # IMPORTANT:
             # Do NOT remove ")" because valid URLs can
-            # contain parentheses, such as:
-            #
-            # https://en.wikipedia.org/wiki/
-            # Superstore_(TV_series)
+            # contain parentheses.
 
             url = url.rstrip(
                 ".,!?;"
@@ -729,31 +729,10 @@ class BrowserTool:
         return query
 
     # =====================================================
-    # READ WEB PAGE
+    # EXTRACT WEBPAGE TEXT
     # =====================================================
 
-    def read_webpage(self, query):
-
-        if not query:
-
-            return (
-
-                "No webpage URL specified."
-
-            )
-
-        url = self.extract_url(
-            query
-        )
-
-        if not url:
-
-            return (
-
-                "Please provide a valid "
-                "webpage URL."
-
-            )
+    def extract_webpage_text(self, url):
 
         try:
 
@@ -905,68 +884,89 @@ class BrowserTool:
 
             if not text.strip():
 
-                return (
+                return None
 
-                    "Could not extract text "
-                    "from this webpage."
-
-                )
-
-            # ---------------------------------------------
-            # LIMIT OUTPUT SIZE
-            # ---------------------------------------------
-
-            text = text[:10000]
-
-            logger.info(
-
-                f"Successfully read webpage: "
-                f"{url}"
-
-            )
-
-            return (
-
-                f"📄 Webpage content:\n\n"
-
-                f"{text}"
-
-            )
+            return text[:20000]
 
         except requests.RequestException as e:
 
             logger.error(
 
-                f"Failed to read webpage "
+                f"Failed to access webpage "
                 f"{url}: {e}"
 
             )
 
-            return (
-
-                f"❌ Could not access webpage: "
-                f"{e}"
-
-            )
+            return None
 
         except Exception as e:
 
             logger.error(
 
-                f"Webpage reading error: "
+                f"Webpage extraction error: "
                 f"{e}"
 
             )
+
+            return None
+
+    # =====================================================
+    # READ WEB PAGE
+    # =====================================================
+
+    def read_webpage(self, query):
+
+        if not query:
 
             return (
 
-                f"❌ Error reading webpage: "
-                f"{e}"
+                "No webpage URL specified."
 
             )
 
+        url = self.extract_url(
+            query
+        )
+
+        if not url:
+
+            return (
+
+                "Please provide a valid "
+                "webpage URL."
+
+            )
+
+        text = self.extract_webpage_text(
+            url
+        )
+
+        if not text:
+
+            return (
+
+                "❌ Could not extract text "
+                "from this webpage."
+
+            )
+
+        logger.info(
+
+            f"Successfully read webpage: "
+            f"{url}"
+
+        )
+
+        return (
+
+            f"📄 Webpage content:\n\n"
+
+            f"{text}"
+
+        )
+
     # =====================================================
-    # SUMMARIZE WEBPAGE
+    # SUMMARIZE WEBPAGE WITH OLLAMA
     # =====================================================
 
     def summarize_webpage(self, query):
@@ -997,98 +997,111 @@ class BrowserTool:
             )
 
         # ---------------------------------------------
-        # READ WEBPAGE
+        # CHECK LLM
         # ---------------------------------------------
 
-        content = self.read_webpage(
-            url
-        )
-
-        if content.startswith(
-            "❌"
-        ):
-
-            return content
-
-        if content.startswith(
-            "Could not"
-        ):
-
-            return content
-
-        # ---------------------------------------------
-        # REMOVE OUTPUT LABEL
-        # ---------------------------------------------
-
-        webpage_text = content.replace(
-
-            "📄 Webpage content:\n\n",
-
-            "",
-
-            1
-
-        )
-
-        # ---------------------------------------------
-        # SPLIT INTO SENTENCES
-        # ---------------------------------------------
-
-        sentences = re.split(
-
-            r"(?<=[.!?])\s+",
-
-            webpage_text
-
-        )
-
-        sentences = [
-
-            sentence.strip()
-
-            for sentence in sentences
-
-            if len(
-                sentence.strip()
-            ) > 40
-
-        ]
-
-        # ---------------------------------------------
-        # SELECT MAIN SENTENCES
-        # ---------------------------------------------
-
-        summary_sentences = sentences[:8]
-
-        if not summary_sentences:
+        if not self.llm:
 
             return (
 
-                "Could not generate a "
-                "summary for this webpage."
+                "❌ AI summarization is unavailable "
+                "because the Ollama LLM is not connected."
 
             )
 
-        summary = " ".join(
+        # ---------------------------------------------
+        # EXTRACT WEBPAGE TEXT
+        # ---------------------------------------------
 
-            summary_sentences
-
+        webpage_text = self.extract_webpage_text(
+            url
         )
 
-        logger.info(
+        if not webpage_text:
 
-            f"Successfully summarized webpage: "
-            f"{url}"
+            return (
 
-        )
+                "❌ Could not extract text "
+                "from this webpage."
 
-        return (
+            )
 
-            f"📝 Summary:\n\n"
+        # ---------------------------------------------
+        # LIMIT TEXT SENT TO MODEL
+        # ---------------------------------------------
 
-            f"{summary}"
+        webpage_text = webpage_text[:16000]
 
-        )
+        # ---------------------------------------------
+        # CREATE SUMMARY PROMPT
+        # ---------------------------------------------
+
+        prompt = f"""
+You are an intelligent webpage summarization assistant.
+
+Summarize the webpage below.
+
+Requirements:
+- Identify the main topic.
+- Explain the most important facts and ideas.
+- Keep the summary clear and concise.
+- Use bullet points when useful.
+- Do not invent information.
+- Only use information from the webpage.
+- Ignore navigation menus, advertisements, and unrelated webpage text.
+
+WEBPAGE URL:
+{url}
+
+WEBPAGE CONTENT:
+{webpage_text}
+"""
+
+        try:
+
+            summary = self.llm.generate_response(
+                prompt
+            )
+
+            if not summary:
+
+                return (
+
+                    "❌ The AI could not generate "
+                    "a summary."
+
+                )
+
+            logger.info(
+
+                f"Successfully summarized webpage "
+                f"using Ollama: {url}"
+
+            )
+
+            return (
+
+                f"📝 AI Summary:\n\n"
+
+                f"{summary}"
+
+            )
+
+        except Exception as e:
+
+            logger.error(
+
+                f"AI summarization error: "
+                f"{e}"
+
+            )
+
+            return (
+
+                f"❌ Error generating summary: "
+                f"{e}"
+
+            )
 
     # =====================================================
     # EXECUTE ACTION
