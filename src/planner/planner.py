@@ -185,104 +185,117 @@ class Planner:
             )
 
         # =====================================================
+        # BROWSER READ INTENT
+        # IMPORTANT: MUST COME BEFORE SEARCH INTENT
+        # =====================================================
+
+        elif (
+
+            t.startswith("read ")
+
+            or t.startswith("read this webpage")
+
+            or t.startswith("read this website")
+
+            or t.startswith("read webpage")
+
+            or t.startswith("read website")
+
+            or t.startswith("extract text from")
+
+            or (
+
+                "https://" in t
+
+                and any(
+
+                    word in t
+
+                    for word in [
+
+                        "read",
+
+                        "extract",
+
+                        "summarize"
+
+                    ]
+
+                )
+
+            )
+
+        ):
+
+            plan.append(
+
+                {
+
+                    "tool": "browser",
+
+                    "action": "read",
+
+                    "input": {
+
+                        "query": query
+
+                    }
+
+                }
+
+            )
+
+        # =====================================================
         # BROWSER SEARCH INTENT
         # =====================================================
-        
+
         elif any(
-        
+
             phrase in t
-        
+
             for phrase in [
-        
+
                 "search for",
-        
+
                 "search",
-        
+
                 "look up",
-        
+
                 "find online",
-        
+
                 "google"
-        
+
             ]
-        
+
         ):
-        
+
             plan.append(
-        
+
                 {
-        
+
                     "tool": "browser",
-        
+
                     "action": "search",
-        
+
                     "input": {
-        
+
                         "query": query
-        
+
                     }
-        
+
                 }
-        
+
             )
 
         # =====================================================
-        # BROWSER READ INTENT
-        # =====================================================
-        
-        elif (
-        
-            t.startswith("read ")
-        
-            or any(
-        
-                phrase in t
-        
-                for phrase in [
-        
-                    "read this webpage",
-        
-                    "read this website",
-        
-                    "read webpage",
-        
-                    "read website",
-        
-                    "extract text from"
-        
-                ]
-        
-            )
-        
-        ):
-        
-            plan.append(
-        
-                {
-        
-                    "tool": "browser",
-        
-                    "action": "read",
-        
-                    "input": {
-        
-                        "query": query
-        
-                    }
-        
-                }
-        
-            )
-
-        # =====================================================
-        # BROWSER INTENT
+        # BROWSER OPEN INTENT
         # =====================================================
 
         elif any(
 
-            word in t
+            phrase in t
 
-            for word in [
+            for phrase in [
 
                 "open youtube",
 
