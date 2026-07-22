@@ -185,6 +185,48 @@ class Planner:
             )
 
         # =====================================================
+        # BROWSER SEARCH INTENT
+        # =====================================================
+        
+        elif any(
+        
+            phrase in t
+        
+            for phrase in [
+        
+                "search for",
+        
+                "search",
+        
+                "look up",
+        
+                "find online",
+        
+                "google"
+        
+            ]
+        
+        ):
+        
+            plan.append(
+        
+                {
+        
+                    "tool": "browser",
+        
+                    "action": "search",
+        
+                    "input": {
+        
+                        "query": query
+        
+                    }
+        
+                }
+        
+            )
+
+        # =====================================================
         # BROWSER INTENT
         # =====================================================
 
