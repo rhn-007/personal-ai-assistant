@@ -262,23 +262,43 @@ class CalendarTool:
 
         phrases_to_remove = [
 
+            "delete reminder for",
+
+            "delete event for",
+    
+            "delete appointment for",
+    
+            "remove reminder for",
+    
+            "remove event for",
+    
+            "remove appointment for",
+    
+            "cancel reminder for",
+    
+            "cancel event for",
+    
+            "cancel appointment for",
+    
             "delete",
-
+    
             "remove",
-
+    
             "cancel",
-
-            "event",
-
+    
             "reminder",
-
+    
+            "event",
+    
             "appointment",
-
+    
             "the",
-
+    
             "my",
-
-            "this"
+    
+            "this",
+    
+            "for"
         ]
 
         title = text
