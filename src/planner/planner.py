@@ -22,6 +22,143 @@ class Planner:
         plan = []
 
         # =====================================================
+        # BROWSER SUMMARY FOLLOW-UP INTENT
+        #
+        # IMPORTANT:
+        # This must come BEFORE calendar, Spotify, and
+        # normal browser intents.
+        #
+        # Examples:
+        # - give a longer summary
+        # - give a longer summary in about 200 words
+        # - make the summary longer
+        # - expand the summary
+        # - make it more detailed
+        # =====================================================
+
+        summary_follow_up_phrases = [
+
+            "longer summary",
+
+            "longer summarize",
+
+            "give a longer summary",
+
+            "give me a longer summary",
+
+            "expand the summary",
+
+            "expand that summary",
+
+            "make the summary longer",
+
+            "make it longer",
+
+            "make the summary more detailed",
+
+            "more detailed summary",
+
+            "expand it",
+
+            "elaborate on the summary",
+
+            "explain the summary in more detail",
+
+            "give more details"
+
+        ]
+
+        is_summary_follow_up = any(
+
+            phrase in t
+
+            for phrase in summary_follow_up_phrases
+
+        )
+
+        # Also detect requests such as:
+        #
+        # "give me a 200 word summary"
+        # "make it around 300 words"
+        # "summarize it in 250 words"
+
+        contains_word_count = bool(
+
+            re.search(
+
+                r"\b\d+\s*words?\b",
+
+                t
+
+            )
+
+        )
+
+        summary_context_words = [
+
+            "summary",
+
+            "summarize",
+
+            "summarise",
+
+            "summarization",
+
+            "summarisation"
+
+        ]
+
+        contains_summary_context = any(
+
+            word in t
+
+            for word in summary_context_words
+
+        )
+
+        if (
+
+            is_summary_follow_up
+
+            or (
+
+                contains_word_count
+
+                and contains_summary_context
+
+                and not (
+
+                    "http://" in t
+
+                    or "https://" in t
+
+                )
+
+            )
+
+        ):
+
+            plan.append(
+
+                {
+
+                    "tool": "browser",
+
+                    "action": "summarize_last",
+
+                    "input": {
+
+                        "query": query
+
+                    }
+
+                }
+
+            )
+
+            return plan
+
+        # =====================================================
         # CALENDAR INTENT
         # =====================================================
 
@@ -288,8 +425,7 @@ class Planner:
                 )
 
         # =====================================================
-        # BROWSER SUMMARIZE INTENT
-        # IMPORTANT: MUST COME BEFORE READ INTENT
+        # BROWSER SUMMARIZE NEW WEBPAGE INTENT
         # =====================================================
 
         elif (
