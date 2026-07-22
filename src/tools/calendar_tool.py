@@ -253,10 +253,96 @@ class CalendarTool:
         )
 
     # =====================================================
-    # DELETE LATEST EVENT
+    # EXTRACT DELETE TITLE
     # =====================================================
 
-    def delete_event(self):
+    def extract_delete_title(self, query):
+
+        text = query.lower().strip()
+
+        phrases_to_remove = [
+
+            "delete",
+
+            "remove",
+
+            "cancel",
+
+            "event",
+
+            "reminder",
+
+            "appointment",
+
+            "the",
+
+            "my",
+
+            "this"
+        ]
+
+        title = text
+
+        for phrase in phrases_to_remove:
+
+            title = title.replace(
+                phrase,
+                ""
+            )
+
+        title = re.sub(
+            r"\s+",
+            " ",
+            title
+        ).strip()
+
+        return title
+
+    # =====================================================
+    # DELETE EVENT
+    # =====================================================
+
+    def delete_event(self, query=None):
+
+        delete_title = None
+
+        if query:
+
+            delete_title = (
+                self.extract_delete_title(
+                    query
+                )
+            )
+
+        # ---------------------------------
+        # DELETE SPECIFIC EVENT
+        # ---------------------------------
+
+        if delete_title:
+
+            event = (
+                self.calendar.delete_event_by_title(
+                    delete_title
+                )
+            )
+
+            if not event:
+
+                return (
+                    f"❌ Could not find an event "
+                    f"matching '{delete_title}'."
+                )
+
+            return (
+
+                f"🗑️ Deleted event: "
+                f"{event['title']}"
+
+            )
+
+        # ---------------------------------
+        # DELETE LATEST EVENT
+        # ---------------------------------
 
         event = (
             self.calendar.delete_latest_event()
@@ -307,7 +393,9 @@ class CalendarTool:
 
         if action == "delete":
 
-            return self.delete_event()
+            return self.delete_event(
+                query
+            )
 
         return (
 
