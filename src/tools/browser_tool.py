@@ -754,7 +754,6 @@ class BrowserTool:
 
                     "noscript",
 
-                    " 광고"
 
                 ]
 
