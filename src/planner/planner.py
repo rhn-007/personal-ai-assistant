@@ -1,51 +1,29 @@
+import re
+
+
 class Planner:
 
-```
-def __init__(self, tool_manager):
+    def __init__(self, tool_manager):
 
-    self.tool_manager = tool_manager
-
-# =====================================================
-# CREATE PLAN
-# =====================================================
-
-def create_plan(self, query: str):
-
-    if not query or not isinstance(query, str):
-
-        return None
-
-    t = query.lower().strip()
-
-    plan = []
+        self.tool_manager = tool_manager
 
     # =====================================================
-    # CALENDAR INTENT
+    # CREATE PLAN
     # =====================================================
 
-    if any(
+    def create_plan(self, query: str):
 
-        word in t
+        if not query or not isinstance(query, str):
 
-        for word in [
+            return None
 
-            "calendar",
+        t = query.lower().strip()
 
-            "schedule",
+        plan = []
 
-            "meeting",
-
-            "reminder",
-
-            "event"
-
-        ]
-
-    ):
-
-        # ---------------------------------------------
-        # DELETE EVENT
-        # ---------------------------------------------
+        # =====================================================
+        # CALENDAR INTENT
+        # =====================================================
 
         if any(
 
@@ -53,37 +31,123 @@ def create_plan(self, query: str):
 
             for word in [
 
-                "delete",
+                "calendar",
 
-                "remove",
+                "schedule",
 
-                "cancel"
+                "meeting",
+
+                "reminder",
+
+                "event"
 
             ]
 
         ):
 
-            plan.append(
+            # ---------------------------------------------
+            # DELETE EVENT
+            # ---------------------------------------------
 
-                {
+            if any(
 
-                    "tool": "calendar",
+                word in t
 
-                    "action": "delete",
+                for word in [
 
-                    "input": {
+                    "delete",
 
-                        "query": query
+                    "remove",
+
+                    "cancel"
+
+                ]
+
+            ):
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "delete",
+
+                        "input": {
+
+                            "query": query
+
+                        }
 
                     }
 
-                }
+                )
 
-            )
+            # ---------------------------------------------
+            # SHOW CALENDAR
+            # ---------------------------------------------
 
-        # ---------------------------------------------
-        # SHOW CALENDAR
-        # ---------------------------------------------
+            elif any(
+
+                word in t
+
+                for word in [
+
+                    "show",
+
+                    "list",
+
+                    "view",
+
+                    "what do i have",
+
+                    "what's on"
+
+                ]
+
+            ):
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "list",
+
+                        "input": {}
+
+                    }
+
+                )
+
+            # ---------------------------------------------
+            # CREATE EVENT
+            # ---------------------------------------------
+
+            else:
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "create",
+
+                        "input": {
+
+                            "query": query
+
+                        }
+
+                    }
+
+                )
+
+        # =====================================================
+        # SPOTIFY INTENT
+        # =====================================================
 
         elif any(
 
@@ -91,15 +155,15 @@ def create_plan(self, query: str):
 
             for word in [
 
-                "show",
+                "spotify",
 
-                "list",
+                "play",
 
-                "view",
+                "song",
 
-                "what do i have",
+                "music",
 
-                "what's on"
+                "audio"
 
             ]
 
@@ -109,29 +173,9 @@ def create_plan(self, query: str):
 
                 {
 
-                    "tool": "calendar",
+                    "tool": "spotify",
 
-                    "action": "list",
-
-                    "input": {}
-
-                }
-
-            )
-
-        # ---------------------------------------------
-        # CREATE EVENT
-        # ---------------------------------------------
-
-        else:
-
-            plan.append(
-
-                {
-
-                    "tool": "calendar",
-
-                    "action": "create",
+                    "action": "play",
 
                     "input": {
 
@@ -143,110 +187,145 @@ def create_plan(self, query: str):
 
             )
 
-    # =====================================================
-    # SPOTIFY INTENT
-    # =====================================================
+        # =====================================================
+        # BROWSER SEARCH RESULT INTENT
+        # =====================================================
 
-    elif any(
+        elif (
 
-        word in t
+            (
 
-        for word in [
+                "open result" in t
 
-            "spotify",
+                or "read result" in t
 
-            "play",
+                or "open search result" in t
 
-            "song",
+                or "read search result" in t
 
-            "music",
+            )
 
-            "audio"
+            and any(
 
-        ]
+                char.isdigit()
 
-    ):
+                for char in t
 
-        plan.append(
+            )
 
-            {
+        ):
 
-                "tool": "spotify",
+            number_match = re.search(
 
-                "action": "play",
+                r"\b(\d+)\b",
 
-                "input": {
+                t
 
-                    "query": query
+            )
 
-                }
+            if not number_match:
 
-            }
+                return None
 
-        )
+            result_number = (
 
-    # =====================================================
-    # BROWSER SEARCH RESULT INTENT
-    # IMPORTANT: MUST COME FIRST
-    # =====================================================
+                number_match.group(1)
 
-    elif (
+            )
 
-        (
+            # ---------------------------------------------
+            # READ RESULT
+            # ---------------------------------------------
 
-            "open result" in t
+            if (
 
-            or "read result" in t
+                "read result" in t
 
-            or "open search result" in t
+                or "read search result" in t
 
-            or "read search result" in t
+            ):
 
-        )
+                plan.append(
 
-        and any(
+                    {
 
-            char.isdigit()
+                        "tool": "browser",
 
-            for char in t
+                        "action": "read_result",
 
-        )
+                        "input": {
 
-    ):
+                            "query": result_number
 
-        # ---------------------------------------------
-        # EXTRACT RESULT NUMBER
-        # ---------------------------------------------
+                        }
 
-        import re
+                    }
 
-        number_match = re.search(
+                )
 
-            r"\b(\d+)\b",
+            # ---------------------------------------------
+            # OPEN RESULT
+            # ---------------------------------------------
 
-            t
+            else:
 
-        )
+                plan.append(
 
-        if not number_match:
+                    {
 
-            return None
+                        "tool": "browser",
 
-        result_number = (
+                        "action": "open_result",
 
-            number_match.group(1)
+                        "input": {
 
-        )
+                            "query": result_number
 
-        # ---------------------------------------------
-        # READ RESULT
-        # ---------------------------------------------
+                        }
 
-        if (
+                    }
 
-            "read result" in t
+                )
 
-            or "read search result" in t
+        # =====================================================
+        # BROWSER READ INTENT
+        # =====================================================
+
+        elif (
+
+            t.startswith("read ")
+
+            or t.startswith("read this webpage")
+
+            or t.startswith("read this website")
+
+            or t.startswith("read webpage")
+
+            or t.startswith("read website")
+
+            or t.startswith("extract text from")
+
+            or (
+
+                "https://" in t
+
+                and any(
+
+                    word in t
+
+                    for word in [
+
+                        "read",
+
+                        "extract",
+
+                        "summarize"
+
+                    ]
+
+                )
+
+            )
 
         ):
 
@@ -256,11 +335,11 @@ def create_plan(self, query: str):
 
                     "tool": "browser",
 
-                    "action": "read_result",
+                    "action": "read",
 
                     "input": {
 
-                        "query": result_number
+                        "query": query
 
                     }
 
@@ -268,11 +347,29 @@ def create_plan(self, query: str):
 
             )
 
-        # ---------------------------------------------
-        # OPEN RESULT
-        # ---------------------------------------------
+        # =====================================================
+        # BROWSER SEARCH INTENT
+        # =====================================================
 
-        else:
+        elif any(
+
+            phrase in t
+
+            for phrase in [
+
+                "search for",
+
+                "search",
+
+                "look up",
+
+                "find online",
+
+                "google"
+
+            ]
+
+        ):
 
             plan.append(
 
@@ -280,11 +377,11 @@ def create_plan(self, query: str):
 
                     "tool": "browser",
 
-                    "action": "open_result",
+                    "action": "search",
 
                     "input": {
 
-                        "query": result_number
+                        "query": query
 
                     }
 
@@ -292,285 +389,156 @@ def create_plan(self, query: str):
 
             )
 
-    # =====================================================
-    # BROWSER READ INTENT
-    # IMPORTANT: MUST COME BEFORE SEARCH INTENT
-    # =====================================================
+        # =====================================================
+        # BROWSER OPEN INTENT
+        # =====================================================
 
-    elif (
+        elif any(
 
-        t.startswith(
+            phrase in t
 
-            "read "
+            for phrase in [
 
-        )
+                "open youtube",
 
-        or t.startswith(
+                "open google",
 
-            "read this webpage"
+                "open github",
 
-        )
+                "open wikipedia",
 
-        or t.startswith(
+                "open chatgpt",
 
-            "read this website"
+                "open reddit",
 
-        )
+                "open instagram",
 
-        or t.startswith(
+                "open facebook",
 
-            "read webpage"
+                "open twitter",
 
-        )
+                "open x",
 
-        or t.startswith(
+                "open website",
 
-            "read website"
+                "open browser",
 
-        )
+                "go to",
 
-        or t.startswith(
+                "visit",
 
-            "extract text from"
+                "browse"
 
-        )
+            ]
 
-        or (
+        ):
 
-            "https://" in t
+            plan.append(
 
-            and any(
+                {
 
-                word in t
+                    "tool": "browser",
 
-                for word in [
+                    "action": "open",
 
-                    "read",
+                    "input": {
 
-                    "extract",
+                        "query": query
 
-                    "summarize"
+                    }
 
-                ]
+                }
 
             )
 
-        )
+        # =====================================================
+        # SYSTEM INTENT
+        # =====================================================
 
-    ):
+        elif any(
 
-        plan.append(
+            word in t
 
-            {
+            for word in [
 
-                "tool": "browser",
+                "open",
 
-                "action": "read",
+                "launch",
 
-                "input": {
+                "start",
 
-                    "query": query
+                "folder",
 
-                }
+                "file"
 
-            }
+            ]
 
-        )
+        ):
 
-    # =====================================================
-    # BROWSER SEARCH INTENT
-    # =====================================================
+            plan.append(
 
-    elif any(
+                {
 
-        phrase in t
+                    "tool": "system",
 
-        for phrase in [
+                    "action": "open",
 
-            "search for",
+                    "input": {
 
-            "search",
+                        "query": query
 
-            "look up",
-
-            "find online",
-
-            "google"
-
-        ]
-
-    ):
-
-        plan.append(
-
-            {
-
-                "tool": "browser",
-
-                "action": "search",
-
-                "input": {
-
-                    "query": query
+                    }
 
                 }
 
-            }
+            )
 
-        )
+        # =====================================================
+        # EMAIL INTENT
+        # =====================================================
 
-    # =====================================================
-    # BROWSER OPEN INTENT
-    # =====================================================
+        elif any(
 
-    elif any(
+            word in t
 
-        phrase in t
+            for word in [
 
-        for phrase in [
+                "email",
 
-            "open youtube",
+                "mail",
 
-            "open google",
+                "gmail",
 
-            "open github",
+                "inbox"
 
-            "open wikipedia",
+            ]
 
-            "open chatgpt",
+        ):
 
-            "open reddit",
+            plan.append(
 
-            "open instagram",
+                {
 
-            "open facebook",
+                    "tool": "email",
 
-            "open twitter",
+                    "action": "default",
 
-            "open x",
+                    "input": {
 
-            "open website",
+                        "query": query
 
-            "open browser",
-
-            "go to",
-
-            "visit",
-
-            "browse"
-
-        ]
-
-    ):
-
-        plan.append(
-
-            {
-
-                "tool": "browser",
-
-                "action": "open",
-
-                "input": {
-
-                    "query": query
+                    }
 
                 }
 
-            }
+            )
 
-        )
+        # =====================================================
+        # FALLBACK
+        # =====================================================
 
-    # =====================================================
-    # SYSTEM INTENT
-    # =====================================================
+        else:
 
-    elif any(
+            return None
 
-        word in t
-
-        for word in [
-
-            "open",
-
-            "launch",
-
-            "start",
-
-            "folder",
-
-            "file"
-
-        ]
-
-    ):
-
-        plan.append(
-
-            {
-
-                "tool": "system",
-
-                "action": "open",
-
-                "input": {
-
-                    "query": query
-
-                }
-
-            }
-
-        )
-
-    # =====================================================
-    # EMAIL INTENT
-    # =====================================================
-
-    elif any(
-
-        word in t
-
-        for word in [
-
-            "email",
-
-            "mail",
-
-            "gmail",
-
-            "inbox"
-
-        ]
-
-    ):
-
-        plan.append(
-
-            {
-
-                "tool": "email",
-
-                "action": "default",
-
-                "input": {
-
-                    "query": query
-
-                }
-
-            }
-
-        )
-
-    # =====================================================
-    # FALLBACK
-    # =====================================================
-
-    else:
-
-        return None
-
-    return plan
-```
-
+        return plan
