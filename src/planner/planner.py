@@ -227,6 +227,48 @@ class Planner:
             )
 
         # =====================================================
+        # BROWSER READ INTENT
+        # =====================================================
+        
+        elif any(
+        
+            phrase in t
+        
+            for phrase in [
+        
+                "read this webpage",
+        
+                "read this website",
+        
+                "read webpage",
+        
+                "read website",
+        
+                "extract text from"
+        
+            ]
+        
+        ):
+        
+            plan.append(
+        
+                {
+        
+                    "tool": "browser",
+        
+                    "action": "read",
+        
+                    "input": {
+        
+                        "query": query
+        
+                    }
+        
+                }
+        
+            )
+
+        # =====================================================
         # BROWSER INTENT
         # =====================================================
 
