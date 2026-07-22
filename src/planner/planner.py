@@ -32,13 +32,9 @@ class Planner:
             for word in [
 
                 "calendar",
-
                 "schedule",
-
                 "meeting",
-
                 "reminder",
-
                 "event"
 
             ]
@@ -56,9 +52,7 @@ class Planner:
                 for word in [
 
                     "delete",
-
                     "remove",
-
                     "cancel"
 
                 ]
@@ -94,13 +88,9 @@ class Planner:
                 for word in [
 
                     "show",
-
                     "list",
-
                     "view",
-
                     "what do i have",
-
                     "what's on"
 
                 ]
@@ -156,13 +146,9 @@ class Planner:
             for word in [
 
                 "spotify",
-
                 "play",
-
                 "song",
-
                 "music",
-
                 "audio"
 
             ]
@@ -203,10 +189,6 @@ class Planner:
 
                 or "read search result" in t
 
-                or "summarize result" in t
-
-                or "summarize search result" in t
-
             )
 
             and any(
@@ -218,10 +200,6 @@ class Planner:
             )
 
         ):
-
-            # ---------------------------------------------
-            # EXTRACT RESULT NUMBER
-            # ---------------------------------------------
 
             number_match = re.search(
 
@@ -242,40 +220,10 @@ class Planner:
             )
 
             # ---------------------------------------------
-            # SUMMARIZE RESULT
-            # ---------------------------------------------
-
-            if (
-
-                "summarize result" in t
-
-                or "summarize search result" in t
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "browser",
-
-                        "action": "summarize_result",
-
-                        "input": {
-
-                            "query": result_number
-
-                        }
-
-                    }
-
-                )
-
-            # ---------------------------------------------
             # READ RESULT
             # ---------------------------------------------
 
-            elif (
+            if (
 
                 "read result" in t
 
@@ -336,21 +284,23 @@ class Planner:
 
             or t.startswith("summarise ")
 
-            or t.startswith("summarize this webpage")
+            or t.startswith("summary of ")
 
-            or t.startswith("summarize this website")
+            or (
 
-            or t.startswith("summarize webpage")
+                "https://" in t
 
-            or t.startswith("summarize website")
+                and (
 
-            or t.startswith("summarise this webpage")
+                    "summarize" in t
 
-            or t.startswith("summarise this website")
+                    or "summarise" in t
 
-            or t.startswith("summarise webpage")
+                    or "summary" in t
 
-            or t.startswith("summarise website")
+                )
+
+            )
 
         ):
 
