@@ -1,6 +1,9 @@
 import webbrowser
 from urllib.parse import quote
 
+import requests
+from bs4 import BeautifulSoup
+
 from src.utils.logger import setup_logger
 
 
@@ -199,6 +202,151 @@ class BrowserTool:
             f"'{search_query}'."
     
         )
+
+    # =====================================================
+    # READ WEB PAGE
+    # =====================================================
+    
+    def read_webpage(self, url):
+    
+        if not url:
+    
+            return (
+                "No webpage URL specified."
+            )
+    
+        if not (
+    
+            url.startswith(
+                "http://"
+            )
+    
+            or url.startswith(
+                "https://"
+            )
+    
+        ):
+    
+            url = (
+                "https://"
+                + url
+            )
+    
+        try:
+    
+            response = requests.get(
+    
+                url,
+    
+                timeout=10,
+    
+                headers={
+    
+                    "User-Agent":
+                    "Mozilla/5.0"
+    
+                }
+    
+            )
+    
+            response.raise_for_status()
+    
+            soup = BeautifulSoup(
+    
+                response.text,
+    
+                "html.parser"
+    
+            )
+    
+            # Remove non-content elements
+    
+            for element in soup(
+    
+                [
+    
+                    "script",
+    
+                    "style",
+    
+                    "nav",
+    
+                    "footer",
+    
+                    "header"
+    
+                ]
+    
+            ):
+    
+                element.decompose()
+    
+            text = soup.get_text(
+    
+                separator=" ",
+    
+                strip=True
+    
+            )
+    
+            if not text:
+    
+                return (
+    
+                    "Could not extract text "
+                    "from this webpage."
+    
+                )
+    
+            # Limit output size
+    
+            text = text[:5000]
+    
+            logger.info(
+    
+                f"Successfully read webpage: "
+                f"{url}"
+    
+            )
+    
+            return (
+    
+                f"📄 Webpage content:\n\n"
+    
+                f"{text}"
+    
+            )
+    
+        except requests.RequestException as e:
+    
+            logger.error(
+    
+                f"Failed to read webpage "
+                f"{url}: {e}"
+    
+            )
+    
+            return (
+    
+                f"❌ Could not access webpage: "
+                f"{e}"
+    
+            )
+    
+        except Exception as e:
+    
+            logger.error(
+    
+                f"Webpage reading error: {e}"
+    
+            )
+    
+            return (
+    
+                f"❌ Error reading webpage: "
+                f"{e}"
+    
+            )
     # =====================================================
     # EXECUTE ACTION
     # =====================================================
@@ -216,6 +364,12 @@ class BrowserTool:
         if action == "open":
 
             return self.open_website(
+                query
+            )
+
+        if action == "read":
+
+            return self.read_webpage(
                 query
             )
 
