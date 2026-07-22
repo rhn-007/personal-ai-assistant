@@ -65,10 +65,6 @@ class BrowserTool:
 
         }
 
-        # ---------------------------------------------
-        # REMOVE COMMAND WORDS
-        # ---------------------------------------------
-
         target = text
 
         for phrase in [
@@ -88,10 +84,6 @@ class BrowserTool:
                 ""
             ).strip()
 
-        # ---------------------------------------------
-        # OPEN KNOWN WEBSITE
-        # ---------------------------------------------
-
         if target in websites:
 
             url = websites[target]
@@ -105,10 +97,6 @@ class BrowserTool:
             return (
                 f"🌐 Opened {target.title()}."
             )
-
-        # ---------------------------------------------
-        # OPEN DIRECT URL
-        # ---------------------------------------------
 
         if (
 
@@ -128,15 +116,27 @@ class BrowserTool:
                 f"🌐 Opened {target}."
             )
 
-        # ---------------------------------------------
-        # SEARCH THE WEB
-        # ---------------------------------------------
+        return self.search_web(
+            target
+        )
+
+    # =====================================================
+    # SEARCH WEB
+    # =====================================================
+
+    def search_web(self, query):
+
+        if not query:
+
+            return (
+                "No search query specified."
+            )
 
         search_url = (
 
             "https://www.google.com/search?q="
 
-            + quote(target)
+            + quote(query)
 
         )
 
@@ -145,14 +145,16 @@ class BrowserTool:
         )
 
         logger.info(
-            f"Performed browser search: "
-            f"{target}"
+
+            f"Performed web search: "
+            f"{query}"
+
         )
 
         return (
 
             f"🔎 Searching the web for "
-            f"'{target}'."
+            f"'{query}'."
 
         )
 
@@ -173,6 +175,12 @@ class BrowserTool:
         if action == "open":
 
             return self.open_website(
+                query
+            )
+
+        if action == "search":
+
+            return self.search_web(
                 query
             )
 
