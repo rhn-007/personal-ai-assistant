@@ -363,7 +363,9 @@ class BrowserTool:
 
                     "aside",
 
-                    "form"
+                    "form",
+
+                    "noscript"
 
                 ]
 
@@ -372,18 +374,76 @@ class BrowserTool:
                 element.decompose()
 
             # ---------------------------------------------
-            # EXTRACT TEXT
+            # EXTRACT TEXT WITH PARAGRAPH STRUCTURE
             # ---------------------------------------------
 
-            text = soup.get_text(
+            paragraphs = []
 
-                separator=" ",
+            for element in soup.find_all(
 
-                strip=True
+                [
+
+                    "h1",
+
+                    "h2",
+
+                    "h3",
+
+                    "h4",
+
+                    "p",
+
+                    "li"
+
+                ]
+
+            ):
+
+                content = element.get_text(
+
+                    " ",
+
+                    strip=True
+
+                )
+
+                if content:
+
+                    paragraphs.append(
+                        content
+                    )
+
+            # ---------------------------------------------
+            # FALLBACK IF NO PARAGRAPHS FOUND
+            # ---------------------------------------------
+
+            if not paragraphs:
+
+                text = soup.get_text(
+
+                    separator=" ",
+
+                    strip=True
+
+                )
+
+                paragraphs = [
+
+                    text
+
+                ]
+
+            # ---------------------------------------------
+            # JOIN CONTENT WITH SEPARATE PARAGRAPHS
+            # ---------------------------------------------
+
+            text = "\n\n".join(
+
+                paragraphs
 
             )
 
-            if not text:
+            if not text.strip():
 
                 return (
 
