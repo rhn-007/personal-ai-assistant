@@ -1,577 +1,1172 @@
 import re
+import webbrowser
+from urllib.parse import quote
 
+import requests
+from bs4 import BeautifulSoup
 
-class Planner:
+from src.utils.logger import setup_logger
 
-    def __init__(self, tool_manager):
+logger = setup_logger(**name**)
 
-        self.tool_manager = tool_manager
+class BrowserTool:
 
-    # =====================================================
-    # CREATE PLAN
-    # =====================================================
+```
+def __init__(self):
 
-    def create_plan(self, query: str):
+    self.name = "browser"
 
-        if not query or not isinstance(query, str):
+    # Stores the most recent search results
+    self.last_search_results = []
 
-            return None
+    logger.info(
+        "BrowserTool initialized"
+    )
 
-        t = query.lower().strip()
+# =====================================================
+# OPEN WEBSITE
+# =====================================================
 
-        plan = []
+def open_website(self, query):
 
-        # =====================================================
-        # CALENDAR INTENT
-        # =====================================================
+    if not query:
 
-        if any(
+        return (
+            "No website specified."
+        )
 
-            word in t
+    text = query.lower().strip()
 
-            for word in [
+    websites = {
 
-                "calendar",
-                "schedule",
-                "meeting",
-                "reminder",
-                "event"
+        "youtube":
+            "https://www.youtube.com",
 
-            ]
+        "google":
+            "https://www.google.com",
 
+        "github":
+            "https://github.com",
+
+        "wikipedia":
+            "https://www.wikipedia.org",
+
+        "chatgpt":
+            "https://chatgpt.com",
+
+        "reddit":
+            "https://www.reddit.com",
+
+        "instagram":
+            "https://www.instagram.com",
+
+        "facebook":
+            "https://www.facebook.com",
+
+        "twitter":
+            "https://twitter.com",
+
+        "x":
+            "https://x.com"
+
+    }
+
+    target = text
+
+    # ---------------------------------------------
+    # REMOVE COMMAND PHRASES
+    # ---------------------------------------------
+
+    for phrase in [
+
+        "open",
+
+        "go to",
+
+        "visit",
+
+        "browse"
+
+    ]:
+
+        if target.startswith(
+            phrase
         ):
 
-            # ---------------------------------------------
-            # DELETE EVENT
-            # ---------------------------------------------
+            target = target[
+                len(phrase):
+            ].strip()
+
+            break
+
+    # ---------------------------------------------
+    # OPEN KNOWN WEBSITE
+    # ---------------------------------------------
+
+    if target in websites:
+
+        url = websites[target]
+
+        webbrowser.open(url)
+
+        logger.info(
+            f"Opened website: {target}"
+        )
+
+        return (
+
+            f"🌐 Opened "
+            f"{target.title()}."
+
+        )
+
+    # ---------------------------------------------
+    # OPEN DIRECT URL
+    # ---------------------------------------------
+
+    if (
+
+        target.startswith(
+            "http://"
+        )
+
+        or target.startswith(
+            "https://"
+        )
+
+    ):
+
+        webbrowser.open(target)
+
+        logger.info(
+            f"Opened URL: {target}"
+        )
+
+        return (
+
+            f"🌐 Opened {target}."
+
+        )
+
+    # ---------------------------------------------
+    # UNKNOWN TARGET → SEARCH
+    # ---------------------------------------------
+
+    return self.search_web(
+        target
+    )
+
+# =====================================================
+# SEARCH WEB
+# =====================================================
+
+def search_web(self, query):
+
+    if not query:
+
+        return (
+            "No search query specified."
+        )
+
+    search_query = (
+        query.lower().strip()
+    )
+
+    # ---------------------------------------------
+    # REMOVE SEARCH COMMAND PHRASES
+    # ---------------------------------------------
+
+    phrases_to_remove = [
+
+        "search for",
+
+        "search",
+
+        "look up",
+
+        "find online",
+
+        "google"
+
+    ]
+
+    for phrase in phrases_to_remove:
+
+        if search_query.startswith(
+            phrase
+        ):
+
+            search_query = (
+
+                search_query[
+                    len(phrase):
+                ]
+
+                .strip()
+
+            )
+
+            break
+
+    if not search_query:
+
+        return (
+
+            "Please specify what you "
+            "want me to search for."
+
+        )
+
+    # ---------------------------------------------
+    # CREATE GOOGLE SEARCH URL
+    # ---------------------------------------------
+
+    search_url = (
+
+        "https://www.google.com/search?q="
+
+        + quote(search_query)
+
+    )
+
+    # ---------------------------------------------
+    # OPEN SEARCH IN BROWSER
+    # ---------------------------------------------
+
+    webbrowser.open(
+        search_url
+    )
+
+    # ---------------------------------------------
+    # FETCH SEARCH RESULTS
+    # ---------------------------------------------
+
+    try:
+
+        response = requests.get(
+
+            search_url,
+
+            timeout=10,
+
+            headers={
+
+                "User-Agent":
+
+                "Mozilla/5.0"
+
+            }
+
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+
+            response.text,
+
+            "html.parser"
+
+        )
+
+        results = []
+
+        # -----------------------------------------
+        # FIND GOOGLE SEARCH RESULT HEADINGS
+        # -----------------------------------------
+
+        for heading in soup.find_all(
+            "h3"
+        ):
+
+            title = heading.get_text(
+                " ",
+                strip=True
+            )
+
+            link = heading.find_parent(
+                "a"
+            )
+
+            if not link:
+
+                continue
+
+            url = link.get(
+                "href"
+            )
+
+            if not url:
+
+                continue
+
+            # -------------------------------------
+            # CLEAN GOOGLE REDIRECT URL
+            # -------------------------------------
+
+            if url.startswith(
+                "/url?q="
+            ):
+
+                url = url.split(
+                    "/url?q=",
+                    1
+                )[1]
+
+                url = url.split(
+                    "&",
+                    1
+                )[0]
+
+            elif url.startswith(
+                "/url?"
+            ):
+
+                continue
+
+            # -------------------------------------
+            # ONLY KEEP REAL HTTP URLS
+            # -------------------------------------
+
+            if not (
+
+                url.startswith(
+                    "http://"
+                )
+
+                or url.startswith(
+                    "https://"
+                )
+
+            ):
+
+                continue
+
+            # -------------------------------------
+            # AVOID DUPLICATES
+            # -------------------------------------
 
             if any(
 
-                word in t
+                result["url"] == url
 
-                for word in [
-
-                    "delete",
-                    "remove",
-                    "cancel"
-
-                ]
+                for result in results
 
             ):
 
-                plan.append(
+                continue
 
-                    {
+            results.append(
 
-                        "tool": "calendar",
+                {
 
-                        "action": "delete",
+                    "title": title,
 
-                        "input": {
+                    "url": url
 
-                            "query": query
+                }
 
-                        }
+            )
 
-                    }
+            if len(results) >= 10:
 
-                )
+                break
 
-            # ---------------------------------------------
-            # SHOW CALENDAR
-            # ---------------------------------------------
+        # -----------------------------------------
+        # SAVE RESULTS FOR LATER
+        # -----------------------------------------
 
-            elif any(
+        self.last_search_results = results
 
-                word in t
+        logger.info(
 
-                for word in [
+            f"Performed web search: "
+            f"{search_query}"
 
-                    "show",
-                    "list",
-                    "view",
-                    "what do i have",
-                    "what's on"
+        )
 
-                ]
+        # -----------------------------------------
+        # FORMAT RESULTS
+        # -----------------------------------------
+
+        if results:
+
+            output = [
+
+                f"🔎 Search results for: "
+                f"{search_query}\n"
+
+            ]
+
+            for index, result in enumerate(
+
+                results,
+
+                start=1
 
             ):
 
-                plan.append(
+                output.append(
 
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "list",
-
-                        "input": {}
-
-                    }
+                    f"{index}. "
+                    f"{result['title']}\n"
+                    f"   {result['url']}"
 
                 )
 
-            # ---------------------------------------------
-            # CREATE EVENT
-            # ---------------------------------------------
+            output.append(
 
-            else:
+                "\nYou can say "
+                "'open result 1' or "
+                "'read result 2'."
 
-                plan.append(
+            )
 
-                    {
+            return "\n".join(
+                output
+            )
 
-                        "tool": "calendar",
+        return (
 
-                        "action": "create",
+            f"🔎 Searching the web for "
+            f"'{search_query}'.\n\n"
 
-                        "input": {
+            "No readable search results "
+            "were found."
 
-                            "query": query
+        )
 
-                        }
+    except requests.RequestException as e:
 
-                    }
+        logger.error(
 
-                )
+            f"Search request failed: "
+            f"{e}"
 
-        # =====================================================
-        # SPOTIFY INTENT
-        # =====================================================
+        )
 
-        elif any(
+        return (
 
-            word in t
+            f"🔎 Searching the web for "
+            f"'{search_query}'."
 
-            for word in [
+        )
 
-                "spotify",
-                "play",
-                "song",
-                "music",
-                "audio"
+    except Exception as e:
+
+        logger.error(
+
+            f"Search parsing error: "
+            f"{e}"
+
+        )
+
+        return (
+
+            f"🔎 Searching the web for "
+            f"'{search_query}'."
+
+        )
+
+# =====================================================
+# OPEN SEARCH RESULT
+# =====================================================
+
+def open_result(self, number):
+
+    if not self.last_search_results:
+
+        return (
+
+            "There are no recent search "
+            "results."
+
+        )
+
+    try:
+
+        index = int(number) - 1
+
+    except ValueError:
+
+        return (
+
+            "Please specify a valid result "
+            "number."
+
+        )
+
+    if (
+
+        index < 0
+
+        or index >= len(
+            self.last_search_results
+        )
+
+    ):
+
+        return (
+
+            "That search result does "
+            "not exist."
+
+        )
+
+    result = (
+
+        self.last_search_results[
+            index
+        ]
+
+    )
+
+    webbrowser.open(
+        result["url"]
+    )
+
+    logger.info(
+
+        f"Opened search result "
+        f"{number}: {result['url']}"
+
+    )
+
+    return (
+
+        f"🌐 Opened result {number}: "
+        f"{result['title']}"
+
+    )
+
+# =====================================================
+# READ SEARCH RESULT
+# =====================================================
+
+def read_result(self, number):
+
+    if not self.last_search_results:
+
+        return (
+
+            "There are no recent search "
+            "results."
+
+        )
+
+    try:
+
+        index = int(number) - 1
+
+    except ValueError:
+
+        return (
+
+            "Please specify a valid result "
+            "number."
+
+        )
+
+    if (
+
+        index < 0
+
+        or index >= len(
+            self.last_search_results
+        )
+
+    ):
+
+        return (
+
+            "That search result does "
+            "not exist."
+
+        )
+
+    result = (
+
+        self.last_search_results[
+            index
+        ]
+
+    )
+
+    logger.info(
+
+        f"Reading search result "
+        f"{number}: {result['url']}"
+
+    )
+
+    return self.read_webpage(
+        result["url"]
+    )
+
+# =====================================================
+# EXTRACT URL FROM QUERY
+# =====================================================
+
+def extract_url(self, query):
+
+    if not query:
+
+        return None
+
+    query = query.strip()
+
+    # -------------------------------------------------
+    # Extract complete URL
+    #
+    # IMPORTANT:
+    # Do not remove ')' because it can be part of a
+    # valid URL, for example:
+    # /wiki/Superstore_(TV_series)
+    # -------------------------------------------------
+
+    url_match = re.search(
+
+        r"https?://\S+",
+
+        query
+
+    )
+
+    if url_match:
+
+        url = url_match.group(
+            0
+        )
+
+        # Remove only punctuation that is very unlikely
+        # to be part of a URL.
+        #
+        # Do NOT remove ')' because Wikipedia URLs
+        # commonly contain parentheses.
+
+        url = url.rstrip(
+            ".,!?;"
+        )
+
+        return url
+
+    # -------------------------------------------------
+    # Remove command phrases
+    # -------------------------------------------------
+
+    prefixes = [
+
+        "read this webpage",
+
+        "read this website",
+
+        "read webpage",
+
+        "read website",
+
+        "summarize this webpage",
+
+        "summarize this website",
+
+        "summarize webpage",
+
+        "summarize website",
+
+        "summarize",
+
+        "read"
+
+    ]
+
+    lower_query = query.lower()
+
+    for prefix in prefixes:
+
+        if lower_query.startswith(
+            prefix
+        ):
+
+            query = query[
+                len(prefix):
+            ].strip()
+
+            break
+
+    if not query:
+
+        return None
+
+    if not (
+
+        query.startswith(
+            "http://"
+        )
+
+        or query.startswith(
+            "https://"
+        )
+
+    ):
+
+        query = (
+
+            "https://"
+
+            + query
+
+        )
+
+    return query
+
+# =====================================================
+# READ WEB PAGE
+# =====================================================
+
+def read_webpage(self, query):
+
+    if not query:
+
+        return (
+
+            "No webpage URL specified."
+
+        )
+
+    url = self.extract_url(
+        query
+    )
+
+    if not url:
+
+        return (
+
+            "Please provide a valid "
+            "webpage URL."
+
+        )
+
+    try:
+
+        response = requests.get(
+
+            url,
+
+            timeout=10,
+
+            headers={
+
+                "User-Agent":
+
+                "Mozilla/5.0"
+
+            }
+
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+
+            response.text,
+
+            "html.parser"
+
+        )
+
+        # ---------------------------------------------
+        # REMOVE NON-CONTENT ELEMENTS
+        # ---------------------------------------------
+
+        for element in soup(
+
+            [
+
+                "script",
+
+                "style",
+
+                "nav",
+
+                "footer",
+
+                "header",
+
+                "aside",
+
+                "form",
+
+                "noscript"
 
             ]
 
         ):
 
-            plan.append(
+            element.decompose()
 
-                {
+        # ---------------------------------------------
+        # EXTRACT TEXT WITH STRUCTURE
+        # ---------------------------------------------
 
-                    "tool": "spotify",
+        paragraphs = []
 
-                    "action": "play",
+        for element in soup.find_all(
 
-                    "input": {
+            [
 
-                        "query": query
+                "h1",
 
-                    }
+                "h2",
 
-                }
+                "h3",
 
-            )
+                "h4",
 
-        # =====================================================
-        # BROWSER SEARCH RESULT INTENT
-        # =====================================================
+                "p",
 
-        elif (
-
-            (
-
-                "open result" in t
-
-                or "read result" in t
-
-                or "open search result" in t
-
-                or "read search result" in t
-
-            )
-
-            and any(
-
-                char.isdigit()
-
-                for char in t
-
-            )
-
-        ):
-
-            number_match = re.search(
-
-                r"\b(\d+)\b",
-
-                t
-
-            )
-
-            if not number_match:
-
-                return None
-
-            result_number = (
-
-                number_match.group(1)
-
-            )
-
-            # ---------------------------------------------
-            # READ RESULT
-            # ---------------------------------------------
-
-            if (
-
-                "read result" in t
-
-                or "read search result" in t
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "browser",
-
-                        "action": "read_result",
-
-                        "input": {
-
-                            "query": result_number
-
-                        }
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # OPEN RESULT
-            # ---------------------------------------------
-
-            else:
-
-                plan.append(
-
-                    {
-
-                        "tool": "browser",
-
-                        "action": "open_result",
-
-                        "input": {
-
-                            "query": result_number
-
-                        }
-
-                    }
-
-                )
-
-        # =====================================================
-        # BROWSER SUMMARIZE INTENT
-        # IMPORTANT: MUST COME BEFORE READ INTENT
-        # =====================================================
-
-        elif (
-
-            t.startswith("summarize ")
-
-            or t.startswith("summarise ")
-
-            or t.startswith("summary of ")
-
-            or (
-
-                "https://" in t
-
-                and (
-
-                    "summarize" in t
-
-                    or "summarise" in t
-
-                    or "summary" in t
-
-                )
-
-            )
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "browser",
-
-                    "action": "summarize",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
-        # BROWSER READ INTENT
-        # =====================================================
-
-        elif (
-
-            t.startswith("read ")
-
-            or t.startswith("read this webpage")
-
-            or t.startswith("read this website")
-
-            or t.startswith("read webpage")
-
-            or t.startswith("read website")
-
-            or t.startswith("extract text from")
-
-            or (
-
-                "https://" in t
-
-                and any(
-
-                    word in t
-
-                    for word in [
-
-                        "read",
-
-                        "extract"
-
-                    ]
-
-                )
-
-            )
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "browser",
-
-                    "action": "read",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
-        # BROWSER SEARCH INTENT
-        # =====================================================
-
-        elif any(
-
-            phrase in t
-
-            for phrase in [
-
-                "search for",
-
-                "search",
-
-                "look up",
-
-                "find online",
-
-                "google"
+                "li"
 
             ]
 
         ):
 
-            plan.append(
+            content = element.get_text(
 
-                {
+                " ",
 
-                    "tool": "browser",
-
-                    "action": "search",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                strip=True
 
             )
 
-        # =====================================================
-        # BROWSER OPEN INTENT
-        # =====================================================
+            if content:
 
-        elif any(
+                paragraphs.append(
+                    content
+                )
 
-            phrase in t
-
-            for phrase in [
-
-                "open youtube",
-
-                "open google",
-
-                "open github",
-
-                "open wikipedia",
-
-                "open chatgpt",
-
-                "open reddit",
-
-                "open instagram",
-
-                "open facebook",
-
-                "open twitter",
-
-                "open x",
-
-                "open website",
-
-                "open browser",
-
-                "go to",
-
-                "visit",
-
-                "browse"
-
-            ]
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "browser",
-
-                    "action": "open",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
-        # SYSTEM INTENT
-        # =====================================================
-
-        elif any(
-
-            word in t
-
-            for word in [
-
-                "open",
-
-                "launch",
-
-                "start",
-
-                "folder",
-
-                "file"
-
-            ]
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "system",
-
-                    "action": "open",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
-        # EMAIL INTENT
-        # =====================================================
-
-        elif any(
-
-            word in t
-
-            for word in [
-
-                "email",
-
-                "mail",
-
-                "gmail",
-
-                "inbox"
-
-            ]
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "email",
-
-                    "action": "default",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
+        # ---------------------------------------------
         # FALLBACK
-        # =====================================================
+        # ---------------------------------------------
 
-        else:
+        if not paragraphs:
 
-            return None
+            text = soup.get_text(
 
-        return plan
+                separator=" ",
+
+                strip=True
+
+            )
+
+            paragraphs = [
+
+                text
+
+            ]
+
+        # ---------------------------------------------
+        # REMOVE DUPLICATE CONSECUTIVE TEXT
+        # ---------------------------------------------
+
+        cleaned_paragraphs = []
+
+        previous = None
+
+        for paragraph in paragraphs:
+
+            if paragraph == previous:
+
+                continue
+
+            cleaned_paragraphs.append(
+                paragraph
+            )
+
+            previous = paragraph
+
+        # ---------------------------------------------
+        # JOIN CONTENT
+        # ---------------------------------------------
+
+        text = "\n\n".join(
+
+            cleaned_paragraphs
+
+        )
+
+        if not text.strip():
+
+            return (
+
+                "Could not extract text "
+                "from this webpage."
+
+            )
+
+        # ---------------------------------------------
+        # LIMIT OUTPUT SIZE
+        # ---------------------------------------------
+
+        text = text[:10000]
+
+        logger.info(
+
+            f"Successfully read webpage: "
+            f"{url}"
+
+        )
+
+        return (
+
+            f"📄 Webpage content:\n\n"
+
+            f"{text}"
+
+        )
+
+    except requests.RequestException as e:
+
+        logger.error(
+
+            f"Failed to read webpage "
+            f"{url}: {e}"
+
+        )
+
+        return (
+
+            f"❌ Could not access webpage: "
+            f"{e}"
+
+        )
+
+    except Exception as e:
+
+        logger.error(
+
+            f"Webpage reading error: "
+            f"{e}"
+
+        )
+
+        return (
+
+            f"❌ Error reading webpage: "
+            f"{e}"
+
+        )
+
+# =====================================================
+# SUMMARIZE WEBPAGE
+# =====================================================
+
+def summarize_webpage(self, query):
+
+    if not query:
+
+        return (
+
+            "No webpage URL specified."
+
+        )
+
+    # ---------------------------------------------
+    # First extract the URL
+    # ---------------------------------------------
+
+    url = self.extract_url(
+        query
+    )
+
+    if not url:
+
+        return (
+
+            "Please provide a valid "
+            "webpage URL."
+
+        )
+
+    # ---------------------------------------------
+    # Read the webpage
+    # ---------------------------------------------
+
+    content = self.read_webpage(
+        url
+    )
+
+    if content.startswith(
+        "❌"
+    ):
+
+        return content
+
+    if content.startswith(
+        "Could not"
+    ):
+
+        return content
+
+    # ---------------------------------------------
+    # Remove output label
+    # ---------------------------------------------
+
+    webpage_text = content.replace(
+
+        "📄 Webpage content:\n\n",
+
+        "",
+
+        1
+
+    )
+
+    # ---------------------------------------------
+    # Simple extractive summary
+    #
+    # This selects the first meaningful sentences.
+    # It does not require an external AI API.
+    # ---------------------------------------------
+
+    sentences = re.split(
+
+        r"(?<=[.!?])\s+",
+
+        webpage_text
+
+    )
+
+    sentences = [
+
+        sentence.strip()
+
+        for sentence in sentences
+
+        if len(
+            sentence.strip()
+        ) > 40
+
+    ]
+
+    summary_sentences = sentences[:8]
+
+    if not summary_sentences:
+
+        return (
+
+            "Could not generate a "
+            "summary for this webpage."
+
+        )
+
+    summary = " ".join(
+
+        summary_sentences
+
+    )
+
+    logger.info(
+
+        f"Successfully summarized webpage: "
+        f"{url}"
+
+    )
+
+    return (
+
+        f"📝 Summary:\n\n"
+
+        f"{summary}"
+
+    )
+
+# =====================================================
+# EXECUTE ACTION
+# =====================================================
+
+def execute_action(
+
+    self,
+
+    action,
+
+    query=None
+
+):
+
+    # ---------------------------------------------
+    # OPEN WEBSITE
+    # ---------------------------------------------
+
+    if action == "open":
+
+        return self.open_website(
+            query
+        )
+
+    # ---------------------------------------------
+    # SEARCH WEB
+    # ---------------------------------------------
+
+    if action == "search":
+
+        return self.search_web(
+            query
+        )
+
+    # ---------------------------------------------
+    # READ WEBPAGE
+    # ---------------------------------------------
+
+    if action == "read":
+
+        return self.read_webpage(
+            query
+        )
+
+    # ---------------------------------------------
+    # SUMMARIZE WEBPAGE
+    # ---------------------------------------------
+
+    if action == "summarize":
+
+        return self.summarize_webpage(
+            query
+        )
+
+    # ---------------------------------------------
+    # OPEN SEARCH RESULT
+    # ---------------------------------------------
+
+    if action == "open_result":
+
+        return self.open_result(
+            query
+        )
+
+    # ---------------------------------------------
+    # READ SEARCH RESULT
+    # ---------------------------------------------
+
+    if action == "read_result":
+
+        return self.read_result(
+            query
+        )
+
+    return (
+
+        f"Unknown browser action: "
+        f"{action}"
+
+    )
+
+# =====================================================
+# TOOL MANAGER COMPATIBILITY
+# =====================================================
+
+def execute(self, query):
+
+    return self.open_website(
+        query
+    )
+```
