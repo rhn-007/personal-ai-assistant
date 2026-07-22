@@ -17,6 +17,9 @@ class BrowserTool:
 
         self.name = "browser"
 
+        # Stores the most recent search results
+        self.last_search_results = []
+
         logger.info(
             "BrowserTool initialized"
         )
@@ -71,6 +74,10 @@ class BrowserTool:
 
         target = text
 
+        # ---------------------------------------------
+        # REMOVE COMMAND PHRASES
+        # ---------------------------------------------
+
         for phrase in [
 
             "open",
@@ -108,8 +115,10 @@ class BrowserTool:
             )
 
             return (
+
                 f"🌐 Opened "
                 f"{target.title()}."
+
             )
 
         # ---------------------------------------------
@@ -135,7 +144,9 @@ class BrowserTool:
             )
 
             return (
+
                 f"🌐 Opened {target}."
+
             )
 
         # ---------------------------------------------
@@ -161,6 +172,10 @@ class BrowserTool:
         search_query = (
             query.lower().strip()
         )
+
+        # ---------------------------------------------
+        # REMOVE SEARCH COMMAND PHRASES
+        # ---------------------------------------------
 
         phrases_to_remove = [
 
@@ -203,6 +218,10 @@ class BrowserTool:
 
             )
 
+        # ---------------------------------------------
+        # CREATE GOOGLE SEARCH URL
+        # ---------------------------------------------
+
         search_url = (
 
             "https://www.google.com/search?q="
@@ -211,22 +230,384 @@ class BrowserTool:
 
         )
 
+        # ---------------------------------------------
+        # OPEN SEARCH IN BROWSER
+        # ---------------------------------------------
+
         webbrowser.open(
             search_url
         )
 
+        # ---------------------------------------------
+        # FETCH SEARCH RESULTS
+        # ---------------------------------------------
+
+        try:
+
+            response = requests.get(
+
+                search_url,
+
+                timeout=10,
+
+                headers={
+
+                    "User-Agent":
+
+                    "Mozilla/5.0"
+
+                }
+
+            )
+
+            response.raise_for_status()
+
+            soup = BeautifulSoup(
+
+                response.text,
+
+                "html.parser"
+
+            )
+
+            results = []
+
+            # -----------------------------------------
+            # FIND GOOGLE SEARCH RESULT HEADINGS
+            # -----------------------------------------
+
+            for heading in soup.find_all(
+                "h3"
+            ):
+
+                title = heading.get_text(
+                    " ",
+                    strip=True
+                )
+
+                link = heading.find_parent(
+                    "a"
+                )
+
+                if not link:
+
+                    continue
+
+                url = link.get(
+                    "href"
+                )
+
+                if not url:
+
+                    continue
+
+                # -------------------------------------
+                # CLEAN GOOGLE REDIRECT URL
+                # -------------------------------------
+
+                if url.startswith(
+                    "/url?q="
+                ):
+
+                    url = url.split(
+                        "/url?q=",
+                        1
+                    )[1]
+
+                    url = url.split(
+                        "&",
+                        1
+                    )[0]
+
+                elif url.startswith(
+                    "/url?"
+                ):
+
+                    continue
+
+                # -------------------------------------
+                # ONLY KEEP REAL HTTP URLS
+                # -------------------------------------
+
+                if not (
+
+                    url.startswith(
+                        "http://"
+                    )
+
+                    or url.startswith(
+                        "https://"
+                    )
+
+                ):
+
+                    continue
+
+                # -------------------------------------
+                # AVOID DUPLICATES
+                # -------------------------------------
+
+                if any(
+
+                    result["url"] == url
+
+                    for result in results
+
+                ):
+
+                    continue
+
+                results.append(
+
+                    {
+
+                        "title": title,
+
+                        "url": url
+
+                    }
+
+                )
+
+                # Keep maximum 10 results
+
+                if len(results) >= 10:
+
+                    break
+
+            # -----------------------------------------
+            # SAVE RESULTS FOR LATER
+            # -----------------------------------------
+
+            self.last_search_results = results
+
+            logger.info(
+
+                f"Performed web search: "
+                f"{search_query}"
+
+            )
+
+            # -----------------------------------------
+            # FORMAT RESULTS
+            # -----------------------------------------
+
+            if results:
+
+                output = [
+
+                    f"🔎 Search results for: "
+                    f"{search_query}\n"
+
+                ]
+
+                for index, result in enumerate(
+
+                    results,
+
+                    start=1
+
+                ):
+
+                    output.append(
+
+                        f"{index}. "
+                        f"{result['title']}\n"
+                        f"   {result['url']}"
+
+                    )
+
+                output.append(
+
+                    "\nYou can say "
+                    "'open result 1' or "
+                    "'read result 2'."
+
+                )
+
+                return "\n".join(
+                    output
+                )
+
+            # -----------------------------------------
+            # FALLBACK
+            # -----------------------------------------
+
+            return (
+
+                f"🔎 Searching the web for "
+                f"'{search_query}'.\n\n"
+
+                "No readable search results "
+                "were found."
+
+            )
+
+        except requests.RequestException as e:
+
+            logger.error(
+
+                f"Search request failed: "
+                f"{e}"
+
+            )
+
+            return (
+
+                f"🔎 Searching the web for "
+                f"'{search_query}'."
+
+            )
+
+        except Exception as e:
+
+            logger.error(
+
+                f"Search parsing error: "
+                f"{e}"
+
+            )
+
+            return (
+
+                f"🔎 Searching the web for "
+                f"'{search_query}'."
+
+            )
+
+    # =====================================================
+    # OPEN SEARCH RESULT
+    # =====================================================
+
+    def open_result(self, number):
+
+        if not self.last_search_results:
+
+            return (
+
+                "There are no recent search "
+                "results."
+
+            )
+
+        try:
+
+            index = int(number) - 1
+
+        except ValueError:
+
+            return (
+
+                "Please specify a valid result "
+                "number."
+
+            )
+
+        if (
+
+            index < 0
+
+            or index >= len(
+                self.last_search_results
+            )
+
+        ):
+
+            return (
+
+                "That search result does "
+                "not exist."
+
+            )
+
+        result = (
+
+            self.last_search_results[
+                index
+            ]
+
+        )
+
+        webbrowser.open(
+            result["url"]
+        )
+
         logger.info(
 
-            f"Performed web search: "
-            f"{search_query}"
+            f"Opened search result "
+            f"{number}: {result['url']}"
 
         )
 
         return (
 
-            f"🔎 Searching the web for "
-            f"'{search_query}'."
+            f"🌐 Opened result {number}: "
+            f"{result['title']}"
 
+        )
+
+    # =====================================================
+    # READ SEARCH RESULT
+    # =====================================================
+
+    def read_result(self, number):
+
+        if not self.last_search_results:
+
+            return (
+
+                "There are no recent search "
+                "results."
+
+            )
+
+        try:
+
+            index = int(number) - 1
+
+        except ValueError:
+
+            return (
+
+                "Please specify a valid result "
+                "number."
+
+            )
+
+        if (
+
+            index < 0
+
+            or index >= len(
+                self.last_search_results
+            )
+
+        ):
+
+            return (
+
+                "That search result does "
+                "not exist."
+
+            )
+
+        result = (
+
+            self.last_search_results[
+                index
+            ]
+
+        )
+
+        logger.info(
+
+            f"Reading search result "
+            f"{number}: {result['url']}"
+
+        )
+
+        return self.read_webpage(
+            result["url"]
         )
 
     # =====================================================
@@ -261,6 +642,12 @@ class BrowserTool:
 
             url = url_match.group(
                 0
+            )
+
+            # Remove trailing punctuation
+
+            url = url.rstrip(
+                ".,!?;)"
             )
 
         else:
@@ -365,7 +752,9 @@ class BrowserTool:
 
                     "form",
 
-                    "noscript"
+                    "noscript",
+
+                    " 광고"
 
                 ]
 
@@ -374,7 +763,7 @@ class BrowserTool:
                 element.decompose()
 
             # ---------------------------------------------
-            # EXTRACT TEXT WITH PARAGRAPH STRUCTURE
+            # EXTRACT TEXT WITH STRUCTURE
             # ---------------------------------------------
 
             paragraphs = []
@@ -414,7 +803,7 @@ class BrowserTool:
                     )
 
             # ---------------------------------------------
-            # FALLBACK IF NO PARAGRAPHS FOUND
+            # FALLBACK
             # ---------------------------------------------
 
             if not paragraphs:
@@ -434,12 +823,32 @@ class BrowserTool:
                 ]
 
             # ---------------------------------------------
-            # JOIN CONTENT WITH SEPARATE PARAGRAPHS
+            # REMOVE DUPLICATE CONSECUTIVE TEXT
+            # ---------------------------------------------
+
+            cleaned_paragraphs = []
+
+            previous = None
+
+            for paragraph in paragraphs:
+
+                if paragraph == previous:
+
+                    continue
+
+                cleaned_paragraphs.append(
+                    paragraph
+                )
+
+                previous = paragraph
+
+            # ---------------------------------------------
+            # JOIN WITH PARAGRAPH SPACING
             # ---------------------------------------------
 
             text = "\n\n".join(
 
-                paragraphs
+                cleaned_paragraphs
 
             )
 
@@ -456,7 +865,7 @@ class BrowserTool:
             # LIMIT OUTPUT SIZE
             # ---------------------------------------------
 
-            text = text[:5000]
+            text = text[:10000]
 
             logger.info(
 
@@ -519,11 +928,19 @@ class BrowserTool:
 
     ):
 
+        # ---------------------------------------------
+        # OPEN WEBSITE
+        # ---------------------------------------------
+
         if action == "open":
 
             return self.open_website(
                 query
             )
+
+        # ---------------------------------------------
+        # SEARCH WEB
+        # ---------------------------------------------
 
         if action == "search":
 
@@ -531,9 +948,33 @@ class BrowserTool:
                 query
             )
 
+        # ---------------------------------------------
+        # READ WEBPAGE
+        # ---------------------------------------------
+
         if action == "read":
 
             return self.read_webpage(
+                query
+            )
+
+        # ---------------------------------------------
+        # OPEN SEARCH RESULT
+        # ---------------------------------------------
+
+        if action == "open_result":
+
+            return self.open_result(
+                query
+            )
+
+        # ---------------------------------------------
+        # READ SEARCH RESULT
+        # ---------------------------------------------
+
+        if action == "read_result":
+
+            return self.read_result(
                 query
             )
 
