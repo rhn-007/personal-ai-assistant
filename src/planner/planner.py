@@ -25,8 +25,7 @@ class Planner:
         # BROWSER SUMMARY FOLLOW-UP INTENT
         #
         # IMPORTANT:
-        # This must come BEFORE calendar, Spotify, and
-        # normal browser intents.
+        # This must come BEFORE all other intents.
         #
         # Examples:
         # - give a longer summary
@@ -76,11 +75,12 @@ class Planner:
 
         )
 
-        # Also detect requests such as:
+        # Detect requests containing a word count
         #
-        # "give me a 200 word summary"
-        # "make it around 300 words"
-        # "summarize it in 250 words"
+        # Examples:
+        # - give me a 200 word summary
+        # - make it around 300 words
+        # - summarize it in 250 words
 
         contains_word_count = bool(
 
@@ -115,6 +115,8 @@ class Planner:
             for word in summary_context_words
 
         )
+
+        # Route summary follow-ups to summarize_last
 
         if (
 
@@ -159,176 +161,10 @@ class Planner:
             return plan
 
         # =====================================================
-        # CALENDAR INTENT
-        # =====================================================
-
-        if any(
-
-            word in t
-
-            for word in [
-
-                "calendar",
-
-                "schedule",
-
-                "meeting",
-
-                "reminder",
-
-                "event"
-
-            ]
-
-        ):
-
-            # ---------------------------------------------
-            # DELETE EVENT
-            # ---------------------------------------------
-
-            if any(
-
-                word in t
-
-                for word in [
-
-                    "delete",
-
-                    "remove",
-
-                    "cancel"
-
-                ]
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "delete",
-
-                        "input": {
-
-                            "query": query
-
-                        }
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # SHOW CALENDAR
-            # ---------------------------------------------
-
-            elif any(
-
-                word in t
-
-                for word in [
-
-                    "show",
-
-                    "list",
-
-                    "view",
-
-                    "what do i have",
-
-                    "what's on"
-
-                ]
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "list",
-
-                        "input": {}
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # CREATE EVENT
-            # ---------------------------------------------
-
-            else:
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "create",
-
-                        "input": {
-
-                            "query": query
-
-                        }
-
-                    }
-
-                )
-
-        # =====================================================
-        # SPOTIFY INTENT
-        # =====================================================
-
-        elif any(
-
-            word in t
-
-            for word in [
-
-                "spotify",
-
-                "play",
-
-                "song",
-
-                "music",
-
-                "audio"
-
-            ]
-
-        ):
-
-            plan.append(
-
-                {
-
-                    "tool": "spotify",
-
-                    "action": "play",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
-
-            )
-
-        # =====================================================
         # BROWSER SEARCH RESULT INTENT
         # =====================================================
 
-        elif (
+        if (
 
             (
 
@@ -364,11 +200,7 @@ class Planner:
 
                 return None
 
-            result_number = (
-
-                number_match.group(1)
-
-            )
+            result_number = number_match.group(1)
 
             # ---------------------------------------------
             # READ RESULT
@@ -609,6 +441,172 @@ class Planner:
                     "tool": "browser",
 
                     "action": "open",
+
+                    "input": {
+
+                        "query": query
+
+                    }
+
+                }
+
+            )
+
+        # =====================================================
+        # CALENDAR INTENT
+        # =====================================================
+
+        elif any(
+
+            word in t
+
+            for word in [
+
+                "calendar",
+
+                "schedule",
+
+                "meeting",
+
+                "reminder",
+
+                "event"
+
+            ]
+
+        ):
+
+            # ---------------------------------------------
+            # DELETE EVENT
+            # ---------------------------------------------
+
+            if any(
+
+                word in t
+
+                for word in [
+
+                    "delete",
+
+                    "remove",
+
+                    "cancel"
+
+                ]
+
+            ):
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "delete",
+
+                        "input": {
+
+                            "query": query
+
+                        }
+
+                    }
+
+                )
+
+            # ---------------------------------------------
+            # SHOW CALENDAR
+            # ---------------------------------------------
+
+            elif any(
+
+                word in t
+
+                for word in [
+
+                    "show",
+
+                    "list",
+
+                    "view",
+
+                    "what do i have",
+
+                    "what's on"
+
+                ]
+
+            ):
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "list",
+
+                        "input": {}
+
+                    }
+
+                )
+
+            # ---------------------------------------------
+            # CREATE EVENT
+            # ---------------------------------------------
+
+            else:
+
+                plan.append(
+
+                    {
+
+                        "tool": "calendar",
+
+                        "action": "create",
+
+                        "input": {
+
+                            "query": query
+
+                        }
+
+                    }
+
+                )
+
+        # =====================================================
+        # SPOTIFY INTENT
+        # =====================================================
+
+        elif any(
+
+            word in t
+
+            for word in [
+
+                "spotify",
+
+                "play",
+
+                "song",
+
+                "music",
+
+                "audio"
+
+            ]
+
+        ):
+
+            plan.append(
+
+                {
+
+                    "tool": "spotify",
+
+                    "action": "play",
 
                     "input": {
 
