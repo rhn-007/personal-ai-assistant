@@ -17,30 +17,18 @@ class BrowserTool:
 
         self.name = "browser"
 
-        # =================================================
-        # OLLAMA LLM INTEGRATION
-        # =================================================
-
+        # Ollama LLM integration
         self.llm = llm
 
-        # =================================================
-        # SEARCH MEMORY
-        # =================================================
-
+        # Store the most recent search results
         self.last_search_results = []
 
-        # =================================================
-        # WEBPAGE MEMORY
-        # =================================================
-
+        # Store the last webpage and summary
         self.last_page_url = None
         self.last_page_text = None
         self.last_summary = None
 
-        # =================================================
-        # HTTP SETTINGS
-        # =================================================
-
+        # HTTP settings
         self.timeout = 10
 
         self.headers = {
@@ -53,9 +41,7 @@ class BrowserTool:
             )
         }
 
-        logger.info(
-            "BrowserTool initialized"
-        )
+        logger.info("BrowserTool initialized")
 
     # =====================================================
     # CAN HANDLE
@@ -70,10 +56,6 @@ class BrowserTool:
         text = query.lower().strip()
 
         browser_phrases = [
-
-            # ---------------------------------------------
-            # WEBSITE OPENING
-            # ---------------------------------------------
 
             "open youtube",
             "open google",
@@ -92,64 +74,32 @@ class BrowserTool:
             "visit",
             "browse",
 
-            # ---------------------------------------------
-            # SEARCH
-            # ---------------------------------------------
-
             "search",
             "search for",
             "look up",
             "find online",
             "google",
 
-            # ---------------------------------------------
-            # READING
-            # ---------------------------------------------
-
             "read ",
             "read this webpage",
             "read this website",
-            "extract text from",
-
-            # ---------------------------------------------
-            # SUMMARIZATION
-            # ---------------------------------------------
 
             "summarize ",
             "summarise ",
 
-            # ---------------------------------------------
-            # SUMMARY FOLLOW-UPS
-            # ---------------------------------------------
-
-            "longer summary",
-            "longer summarize",
-            "give a longer summary",
-            "expand the summary",
-            "expand that summary",
-            "make the summary longer",
-            "make it longer",
-            "more detailed summary",
-            "expand it",
-            "elaborate on the summary",
-
-            # ---------------------------------------------
-            # SEARCH RESULT ACTIONS
-            # ---------------------------------------------
-
             "open result",
             "read result",
             "open search result",
-            "read search result"
+            "read search result",
+
+            "extract text from"
 
         ]
 
         return (
 
             text.startswith("http://")
-
             or text.startswith("https://")
-
             or any(
                 phrase in text
                 for phrase in browser_phrases
@@ -165,9 +115,7 @@ class BrowserTool:
 
         if not query:
 
-            return (
-                "No website specified."
-            )
+            return "No website specified."
 
         text = query.lower().strip()
 
@@ -208,7 +156,7 @@ class BrowserTool:
         target = text
 
         # ---------------------------------------------
-        # REMOVE COMMAND PREFIXES
+        # REMOVE COMMAND PHRASES
         # ---------------------------------------------
 
         prefixes = [
@@ -245,10 +193,8 @@ class BrowserTool:
             )
 
             return (
-
                 f"🌐 Opened "
                 f"{target.title()}."
-
             )
 
         # ---------------------------------------------
@@ -258,7 +204,6 @@ class BrowserTool:
         if (
 
             target.startswith("http://")
-
             or target.startswith("https://")
 
         ):
@@ -269,17 +214,13 @@ class BrowserTool:
                 f"Opened URL: {target}"
             )
 
-            return (
-                f"🌐 Opened {target}."
-            )
+            return f"🌐 Opened {target}."
 
         # ---------------------------------------------
         # UNKNOWN TARGET → SEARCH
         # ---------------------------------------------
 
-        return self.search_web(
-            target
-        )
+        return self.search_web(target)
 
     # =====================================================
     # SEARCH WEB
@@ -289,9 +230,7 @@ class BrowserTool:
 
         if not query:
 
-            return (
-                "No search query specified."
-            )
+            return "No search query specified."
 
         search_query = query.lower().strip()
 
@@ -318,228 +257,34 @@ class BrowserTool:
         if not search_query:
 
             return (
-
                 "Please specify what you "
                 "want me to search for."
-
             )
+
+        # ---------------------------------------------
+        # OPEN GOOGLE SEARCH DIRECTLY
+        # ---------------------------------------------
 
         search_url = (
 
             "https://www.google.com/search?q="
-
             + quote(search_query)
 
         )
 
-        webbrowser.open(
-            search_url
+        webbrowser.open(search_url)
+
+        logger.info(
+            f"Opened Google search for: "
+            f"{search_query}"
         )
 
-        try:
+        return (
 
-            response = requests.get(
+            f"🔎 Searching the web for "
+            f"'{search_query}'."
 
-                search_url,
-
-                timeout=self.timeout,
-
-                headers=self.headers
-
-            )
-
-            response.raise_for_status()
-
-            soup = BeautifulSoup(
-
-                response.text,
-
-                "html.parser"
-
-            )
-
-            results = []
-
-            for heading in soup.find_all("h3"):
-
-                title = heading.get_text(
-                    " ",
-                    strip=True
-                )
-
-                link = heading.find_parent(
-                    "a"
-                )
-
-                if not link:
-
-                    continue
-
-                url = link.get(
-                    "href"
-                )
-
-                if not url:
-
-                    continue
-
-                # -----------------------------------------
-                # CLEAN GOOGLE REDIRECT URL
-                # -----------------------------------------
-
-                if url.startswith(
-                    "/url?q="
-                ):
-
-                    url = url.split(
-                        "/url?q=",
-                        1
-                    )[1]
-
-                    url = url.split(
-                        "&",
-                        1
-                    )[0]
-
-                elif url.startswith(
-                    "/url?"
-                ):
-
-                    continue
-
-                # -----------------------------------------
-                # ONLY KEEP HTTP URLS
-                # -----------------------------------------
-
-                if not (
-
-                    url.startswith(
-                        "http://"
-                    )
-
-                    or url.startswith(
-                        "https://"
-                    )
-
-                ):
-
-                    continue
-
-                # -----------------------------------------
-                # AVOID DUPLICATES
-                # -----------------------------------------
-
-                if any(
-
-                    result["url"] == url
-
-                    for result in results
-
-                ):
-
-                    continue
-
-                results.append({
-
-                    "title":
-                        title,
-
-                    "url":
-                        url
-
-                })
-
-                if len(results) >= 10:
-
-                    break
-
-            self.last_search_results = results
-
-            logger.info(
-
-                f"Performed web search: "
-                f"{search_query}"
-
-            )
-
-            if results:
-
-                output = [
-
-                    f"🔎 Search results for: "
-                    f"{search_query}\n"
-
-                ]
-
-                for index, result in enumerate(
-
-                    results,
-
-                    start=1
-
-                ):
-
-                    output.append(
-
-                        f"{index}. "
-                        f"{result['title']}\n"
-                        f"   {result['url']}"
-
-                    )
-
-                output.append(
-
-                    "\nYou can say "
-                    "'open result 1' or "
-                    "'read result 2'."
-
-                )
-
-                return "\n".join(
-                    output
-                )
-
-            return (
-
-                f"🔎 Searching the web for "
-                f"'{search_query}'.\n\n"
-
-                "No readable search results "
-                "were found."
-
-            )
-
-        except requests.RequestException as e:
-
-            logger.error(
-
-                f"Search request failed: "
-                f"{e}"
-
-            )
-
-            return (
-
-                f"🔎 Searching the web for "
-                f"'{search_query}'."
-
-            )
-
-        except Exception as e:
-
-            logger.error(
-
-                f"Search parsing error: "
-                f"{e}"
-
-            )
-
-            return (
-
-                f"🔎 Searching the web for "
-                f"'{search_query}'."
-
-            )
+        )
 
     # =====================================================
     # OPEN SEARCH RESULT
@@ -550,32 +295,24 @@ class BrowserTool:
         if not self.last_search_results:
 
             return (
-
                 "There are no recent search "
                 "results."
-
             )
 
         try:
 
             index = int(number) - 1
 
-        except (
-            ValueError,
-            TypeError
-        ):
+        except (ValueError, TypeError):
 
             return (
-
                 "Please specify a valid result "
                 "number."
-
             )
 
         if (
 
             index < 0
-
             or index >= len(
                 self.last_search_results
             )
@@ -583,23 +320,13 @@ class BrowserTool:
         ):
 
             return (
-
                 "That search result does "
                 "not exist."
-
             )
 
-        result = (
+        result = self.last_search_results[index]
 
-            self.last_search_results[
-                index
-            ]
-
-        )
-
-        webbrowser.open(
-            result["url"]
-        )
+        webbrowser.open(result["url"])
 
         logger.info(
 
@@ -624,32 +351,24 @@ class BrowserTool:
         if not self.last_search_results:
 
             return (
-
                 "There are no recent search "
                 "results."
-
             )
 
         try:
 
             index = int(number) - 1
 
-        except (
-            ValueError,
-            TypeError
-        ):
+        except (ValueError, TypeError):
 
             return (
-
                 "Please specify a valid result "
                 "number."
-
             )
 
         if (
 
             index < 0
-
             or index >= len(
                 self.last_search_results
             )
@@ -657,19 +376,11 @@ class BrowserTool:
         ):
 
             return (
-
                 "That search result does "
                 "not exist."
-
             )
 
-        result = (
-
-            self.last_search_results[
-                index
-            ]
-
-        )
+        result = self.last_search_results[index]
 
         logger.info(
 
@@ -708,9 +419,7 @@ class BrowserTool:
 
         if url_match:
 
-            url = url_match.group(
-                0
-            )
+            url = url_match.group(0)
 
             return url.rstrip(
                 ".,!?;"
@@ -747,9 +456,7 @@ class BrowserTool:
 
         for prefix in prefixes:
 
-            if lower_query.startswith(
-                prefix
-            ):
+            if lower_query.startswith(prefix):
 
                 query = query[
                     len(prefix):
@@ -763,20 +470,12 @@ class BrowserTool:
 
         if not (
 
-            query.startswith(
-                "http://"
-            )
-
-            or query.startswith(
-                "https://"
-            )
+            query.startswith("http://")
+            or query.startswith("https://")
 
         ):
 
-            query = (
-                "https://"
-                + query
-            )
+            query = "https://" + query
 
         return query
 
@@ -860,9 +559,7 @@ class BrowserTool:
 
                 if content:
 
-                    paragraphs.append(
-                        content
-                    )
+                    paragraphs.append(content)
 
             # ---------------------------------------------
             # FALLBACK
@@ -878,9 +575,7 @@ class BrowserTool:
 
                 )
 
-                paragraphs = [
-                    text
-                ]
+                paragraphs = [text]
 
             # ---------------------------------------------
             # REMOVE DUPLICATE CONSECUTIVE TEXT
@@ -911,10 +606,13 @@ class BrowserTool:
                 return None
 
             # ---------------------------------------------
-            # LIMIT CONTENT
+            # SAVE LAST PAGE
             # ---------------------------------------------
 
-            return text[:10000]
+            self.last_page_url = url
+            self.last_page_text = text[:10000]
+
+            return self.last_page_text
 
         except requests.RequestException as e:
 
@@ -946,49 +644,28 @@ class BrowserTool:
 
         if not query:
 
-            return (
-                "No webpage URL specified."
-            )
+            return "No webpage URL specified."
 
-        url = self.extract_url(
-            query
-        )
+        url = self.extract_url(query)
 
         if not url:
 
             return (
-
                 "Please provide a valid "
                 "webpage URL."
-
             )
 
-        text = self.extract_webpage_text(
-            url
-        )
+        text = self.extract_webpage_text(url)
 
         if not text:
 
             return (
-
                 "❌ Could not extract text "
                 "from this webpage."
-
             )
 
-        # ---------------------------------------------
-        # SAVE LAST PAGE
-        # ---------------------------------------------
-
-        self.last_page_url = url
-        self.last_page_text = text
-        self.last_summary = None
-
         logger.info(
-
-            f"Successfully read webpage: "
-            f"{url}"
-
+            f"Successfully read webpage: {url}"
         )
 
         return (
@@ -1024,9 +701,7 @@ class BrowserTool:
 
             for sentence in sentences
 
-            if len(
-                sentence.strip()
-            ) > 40
+            if len(sentence.strip()) > 40
 
         ]
 
@@ -1035,9 +710,7 @@ class BrowserTool:
             return text[:1500]
 
         return " ".join(
-
             sentences[:8]
-
         )
 
     # =====================================================
@@ -1049,79 +722,51 @@ class BrowserTool:
         if not query:
 
             return (
-
                 "No webpage URL specified."
-
             )
 
         # ---------------------------------------------
         # EXTRACT URL
         # ---------------------------------------------
 
-        url = self.extract_url(
-            query
-        )
+        url = self.extract_url(query)
 
         if not url:
 
             return (
-
                 "Please provide a valid "
                 "webpage URL."
-
             )
 
         logger.info(
-
-            f"Starting webpage summarization: "
-            f"{url}"
-
+            f"Starting webpage summarization: {url}"
         )
 
         # ---------------------------------------------
         # EXTRACT PAGE CONTENT
         # ---------------------------------------------
 
-        webpage_text = (
-            self.extract_webpage_text(
-                url
-            )
-        )
+        webpage_text = self.extract_webpage_text(url)
 
         if not webpage_text:
 
             return (
-
                 "❌ Could not extract text "
                 "from this webpage."
-
             )
 
         # ---------------------------------------------
-        # SAVE PAGE MEMORY
-        # ---------------------------------------------
-
-        self.last_page_url = url
-        self.last_page_text = webpage_text
-        self.last_summary = None
-
-        # ---------------------------------------------
-        # FALLBACK IF LLM UNAVAILABLE
+        # FALLBACK IF LLM IS UNAVAILABLE
         # ---------------------------------------------
 
         if not self.llm:
 
             logger.warning(
-
-                "LLM unavailable. "
-                "Using basic summary."
-
+                "LLM unavailable. Using basic summary."
             )
 
-            summary = (
-                self.basic_summary(
-                    webpage_text
-                )
+            summary = self.basic_summary(
+                webpage_text
             )
 
             self.last_summary = summary
@@ -1139,27 +784,23 @@ class BrowserTool:
 
         webpage_text = webpage_text[:8000]
 
-        # ---------------------------------------------
-        # SUMMARY PROMPT
-        # ---------------------------------------------
-
         prompt = f"""
-You are summarizing a webpage.
+Summarize this webpage clearly and concisely.
 
-Use ONLY the webpage content provided below.
+Rules:
 
-Important rules:
-
-- Do not use user memory.
-- Do not describe the user.
-- Do not invent information.
-- Do not use information from previous unrelated conversations.
+- Use only information from the webpage.
 - Identify the main topic.
 - Mention the most important facts.
-- Keep the summary under 300 words.
+- Do not invent information.
+- Keep the answer under 300 words.
 - Use bullet points when useful.
+- Do not use information about the user.
+- Do not talk about the user's personality, interests,
+  background, or personal profile.
+- Answer only about the webpage.
 
-WEBPAGE URL:
+URL:
 {url}
 
 WEBPAGE CONTENT:
@@ -1169,44 +810,36 @@ WEBPAGE CONTENT:
         try:
 
             logger.info(
-
-                "Sending webpage content "
-                "to Ollama..."
-
+                "Sending webpage content to Ollama..."
             )
 
-            summary = (
-                self.llm.generate_response(
-                    prompt
-                )
+            summary = self.llm.generate_response(
+                prompt
             )
 
             if not summary:
 
                 logger.warning(
-
-                    "Ollama returned an "
-                    "empty response."
-
+                    "Ollama returned an empty response."
                 )
 
-                summary = (
-                    self.basic_summary(
-                        webpage_text
-                    )
+                summary = self.basic_summary(
+                    webpage_text
                 )
 
-            # -----------------------------------------
-            # SAVE SUMMARY
-            # -----------------------------------------
+                self.last_summary = summary
+
+                return (
+
+                    "📝 Summary:\n\n"
+                    + summary
+
+                )
 
             self.last_summary = summary
 
             logger.info(
-
-                "Successfully generated "
-                "AI summary."
-
+                "Successfully generated AI summary."
             )
 
             return (
@@ -1220,15 +853,12 @@ WEBPAGE CONTENT:
 
             logger.error(
 
-                f"AI summarization failed: "
-                f"{e}"
+                f"AI summarization failed: {e}"
 
             )
 
-            summary = (
-                self.basic_summary(
-                    webpage_text
-                )
+            summary = self.basic_summary(
+                webpage_text
             )
 
             self.last_summary = summary
@@ -1244,121 +874,83 @@ WEBPAGE CONTENT:
     # SUMMARIZE LAST PAGE
     # =====================================================
 
-    def summarize_last_page(self, query=None):
+    def summarize_last(self, query=None):
 
         if not self.last_page_text:
 
             return (
 
-                "❌ There is no recently "
-                "summarized webpage to expand."
+                "❌ There is no webpage summary "
+                "to update yet."
 
             )
-
-        # ---------------------------------------------
-        # DEFAULT WORD COUNT
-        # ---------------------------------------------
-
-        word_count = 300
-
-        # ---------------------------------------------
-        # EXTRACT REQUESTED WORD COUNT
-        # ---------------------------------------------
-
-        if query:
-
-            match = re.search(
-
-                r"(\d+)\s*words?",
-
-                query.lower()
-
-            )
-
-            if match:
-
-                word_count = int(
-                    match.group(1)
-                )
-
-        # ---------------------------------------------
-        # LLM FALLBACK
-        # ---------------------------------------------
 
         if not self.llm:
 
-            return (
-
-                "❌ AI summarization is "
-                "currently unavailable."
-
+            summary = self.basic_summary(
+                self.last_page_text
             )
-
-        # ---------------------------------------------
-        # USE ORIGINAL PAGE CONTENT
-        # ---------------------------------------------
-
-        webpage_text = (
-            self.last_page_text[:10000]
-        )
-
-        prompt = f"""
-You previously summarized a webpage.
-
-Create a longer and more detailed summary
-of the SAME webpage.
-
-Requirements:
-
-- Write approximately {word_count} words.
-- Use ONLY information from the webpage content.
-- Do not use personal memory.
-- Do not describe the user.
-- Do not talk about Rohan.
-- Do not invent information.
-- Preserve the important facts from the article.
-- Explain the main topic clearly.
-- Include relevant details and context.
-- Use paragraphs or bullet points where useful.
-
-WEBPAGE URL:
-{self.last_page_url}
-
-ORIGINAL WEBPAGE CONTENT:
-{webpage_text}
-"""
-
-        try:
-
-            logger.info(
-
-                "Generating updated summary "
-                "of last webpage..."
-
-            )
-
-            summary = (
-                self.llm.generate_response(
-                    prompt
-                )
-            )
-
-            if not summary:
-
-                return (
-
-                    "❌ Could not generate "
-                    "an updated summary."
-
-                )
 
             self.last_summary = summary
 
             return (
 
-                f"📝 Updated Summary "
-                f"(approximately {word_count} words):\n\n"
+                "📝 Updated Summary:\n\n"
+                + summary
 
+            )
+
+        prompt = f"""
+Create an updated summary of the webpage below.
+
+The user wants a longer or more detailed summary.
+
+Rules:
+
+- Use only the webpage content provided.
+- Do not use any information about the user.
+- Do not describe the user's personality,
+  interests, background, or preferences.
+- Do not invent facts.
+- Preserve the important facts from the original webpage.
+- Add useful details from the webpage.
+- Aim for approximately 200 to 300 words unless
+  the user specifically requests another word count.
+- Return only the updated summary.
+- Do not talk about these instructions.
+
+Original webpage URL:
+{self.last_page_url}
+
+WEBPAGE CONTENT:
+{self.last_page_text}
+"""
+
+        try:
+
+            logger.info(
+                "Generating updated webpage summary..."
+            )
+
+            summary = self.llm.generate_response(
+                prompt
+            )
+
+            if not summary:
+
+                summary = self.basic_summary(
+                    self.last_page_text
+                )
+
+            self.last_summary = summary
+
+            logger.info(
+                "Successfully generated updated summary."
+            )
+
+            return (
+
+                "📝 Updated Summary:\n\n"
                 + summary
 
             )
@@ -1367,15 +959,21 @@ ORIGINAL WEBPAGE CONTENT:
 
             logger.error(
 
-                f"Updated summary failed: "
+                f"Updated summary generation failed: "
                 f"{e}"
 
             )
 
+            summary = self.basic_summary(
+                self.last_page_text
+            )
+
+            self.last_summary = summary
+
             return (
 
-                f"❌ Error generating "
-                f"updated summary: {e}"
+                "📝 Updated Summary:\n\n"
+                + summary
 
             )
 
@@ -1386,82 +984,38 @@ ORIGINAL WEBPAGE CONTENT:
     def execute_action(
 
         self,
-
         action,
-
         query=None
 
     ):
 
-        # ---------------------------------------------
-        # OPEN
-        # ---------------------------------------------
-
         if action == "open":
 
-            return self.open_website(
-                query
-            )
-
-        # ---------------------------------------------
-        # SEARCH
-        # ---------------------------------------------
+            return self.open_website(query)
 
         if action == "search":
 
-            return self.search_web(
-                query
-            )
-
-        # ---------------------------------------------
-        # READ
-        # ---------------------------------------------
+            return self.search_web(query)
 
         if action == "read":
 
-            return self.read_webpage(
-                query
-            )
-
-        # ---------------------------------------------
-        # SUMMARIZE
-        # ---------------------------------------------
+            return self.read_webpage(query)
 
         if action == "summarize":
 
-            return self.summarize_webpage(
-                query
-            )
-
-        # ---------------------------------------------
-        # SUMMARIZE LAST PAGE
-        # ---------------------------------------------
+            return self.summarize_webpage(query)
 
         if action == "summarize_last":
 
-            return self.summarize_last_page(
-                query
-            )
-
-        # ---------------------------------------------
-        # OPEN RESULT
-        # ---------------------------------------------
+            return self.summarize_last(query)
 
         if action == "open_result":
 
-            return self.open_result(
-                query
-            )
-
-        # ---------------------------------------------
-        # READ RESULT
-        # ---------------------------------------------
+            return self.open_result(query)
 
         if action == "read_result":
 
-            return self.read_result(
-                query
-            )
+            return self.read_result(query)
 
         return (
 
@@ -1476,6 +1030,4 @@ ORIGINAL WEBPAGE CONTENT:
 
     def execute(self, query):
 
-        return self.open_website(
-            query
-        )
+        return self.open_website(query)
