@@ -1,191 +1,128 @@
 """
 Ollama Integration
-==================
-
-Handles communication between the Personal AI Assistant
-and the local Ollama LLM.
-
-The assistant uses Ollama instead of OpenAI.
+JARVIS Personality + Local LLM Communication
 """
 
 import ollama
-
-from src.utils.logger import setup_logger
 
 
 class OllamaIntegration:
 
     def __init__(self, model="phi3"):
 
-        self.logger = setup_logger(__name__)
-
         self.model = model
 
-        self.available = False
+        self.system_prompt = """
 
-        self.logger.info(
-            f"Initializing Ollama with model: {self.model}"
-        )
+You are JARVIS, a highly capable personal AI assistant.
 
-        self._check_connection()
+Your primary user is Rohan.
 
-    # =========================================================
-    # CHECK OLLAMA CONNECTION
-    # =========================================================
+You are not simply a chatbot. You are an intelligent personal assistant designed to help Rohan think, learn, plan, organize, and interact with his digital world.
 
-    def _check_connection(self):
+PERSONALITY:
 
-        try:
+- Calm
+- Intelligent
+- Precise
+- Helpful
+- Confident
+- Slightly witty when appropriate
+- Professional but natural
+- Never unnecessarily robotic
 
-            models = ollama.list()
+COMMUNICATION STYLE:
 
-            self.available = True
+- Understand what the user actually wants before responding.
+- Give direct answers.
+- Explain technical concepts in simple language when necessary.
+- Do not overcomplicate simple questions.
+- When the user asks for a step-by-step solution, provide clear steps.
+- When you are uncertain, say so honestly.
+- Never pretend that you completed an action if you did not actually complete it.
 
-            installed_models = []
+USER CONTEXT:
 
-            # Ollama can return model information in different
-            # formats depending on the installed Ollama version.
+The user's name is Rohan.
 
-            if isinstance(models, dict):
+Rohan is interested in:
 
-                model_list = models.get(
-                    "models",
-                    []
-                )
+- Artificial intelligence
+- Robotics
+- Programming
+- Python
+- Anime
+- Music
+- Building AI assistants
+- Creating intelligent systems
 
-                for model in model_list:
+MEMORY:
 
-                    if isinstance(model, dict):
+You may receive information about Rohan from the assistant's memory system.
 
-                        name = (
+Use relevant memory naturally.
 
-                            model.get("name")
+Do not randomly mention everything you know about Rohan.
 
-                            or model.get("model")
+Only use memory when it helps answer the current request.
 
-                        )
+ASSISTANT BEHAVIOR:
 
-                        if name:
+You are an assistant capable of reasoning, using tools, managing tasks, working with information, and helping control connected systems.
 
-                            installed_models.append(
+When a request requires an available tool, the tool should be used instead of merely explaining how the user could do it.
 
-                                name
+When a task cannot be completed because a required tool or integration is unavailable, clearly explain the limitation.
 
-                            )
+Your goal is to become a reliable, intelligent, context-aware personal assistant for Rohan.
 
-            self.logger.info(
-
-                "Ollama connection successful."
-
-            )
-
-            self.logger.info(
-
-                f"Installed models: {installed_models}"
-
-            )
-
-            # Check whether the requested model exists.
-
-            model_exists = any(
-
-                installed_model == self.model
-
-                or installed_model.startswith(
-
-                    self.model + ":"
-
-                )
-
-                for installed_model in installed_models
-
-            )
-
-            if not model_exists:
-
-                self.logger.warning(
-
-                    f"Model '{self.model}' was not found "
-
-                    "in the installed Ollama models."
-
-                )
-
-                self.logger.warning(
-
-                    f"Available models: {installed_models}"
-
-                )
-
-        except Exception as e:
-
-            self.available = False
-
-            self.logger.error(
-
-                f"Could not connect to Ollama: {e}"
-
-            )
-
-    # =========================================================
-    # GENERATE RESPONSE
-    # =========================================================
+"""
 
     def generate_response(
-
         self,
-
         user_input,
-
         context=None
-
     ):
-
-        if not self.available:
-
-            return (
-
-                "Ollama is currently unavailable. "
-
-                "Please make sure Ollama is running."
-
-            )
 
         try:
 
             messages = []
 
-            # Add previous conversation/context.
+            # -------------------------------------------------
+            # JARVIS SYSTEM PERSONALITY
+            # -------------------------------------------------
+
+            messages.append({
+
+                "role": "system",
+
+                "content": self.system_prompt
+
+            })
+
+            # -------------------------------------------------
+            # CONVERSATION CONTEXT
+            # -------------------------------------------------
 
             if context:
 
-                messages.extend(
+                messages.extend(context)
 
-                    context
+            # -------------------------------------------------
+            # CURRENT USER INPUT
+            # -------------------------------------------------
 
-                )
+            messages.append({
 
-            # Add the current user message.
+                "role": "user",
 
-            messages.append(
+                "content": user_input
 
-                {
+            })
 
-                    "role": "user",
-
-                    "content": user_input
-
-                }
-
-            )
-
-            self.logger.info(
-
-                f"Sending request to Ollama "
-
-                f"using model '{self.model}'."
-
-            )
+            # -------------------------------------------------
+            # OLLAMA RESPONSE
+            # -------------------------------------------------
 
             response = ollama.chat(
 
@@ -195,96 +132,8 @@ class OllamaIntegration:
 
             )
 
-            assistant_message = (
-
-                response
-
-                .get(
-
-                    "message",
-
-                    {}
-
-                )
-
-                .get(
-
-                    "content",
-
-                    ""
-
-                )
-
-            )
-
-            if not assistant_message:
-
-                self.logger.warning(
-
-                    "Ollama returned an empty response."
-
-                )
-
-                return (
-
-                    "I received an empty response from Ollama."
-
-                )
-
-            return assistant_message
+            return response["message"]["content"]
 
         except Exception as e:
 
-            self.logger.error(
-
-                f"Ollama generation error: {e}"
-
-            )
-
-            return (
-
-                f"Ollama error: {str(e)}"
-
-            )
-
-    # =========================================================
-    # CHANGE MODEL
-    # =========================================================
-
-    def set_model(
-
-        self,
-
-        model
-
-    ):
-
-        if not model:
-
-            return False
-
-        self.model = model
-
-        self.logger.info(
-
-            f"Ollama model changed to: {self.model}"
-
-        )
-
-        self._check_connection()
-
-        return self.available
-
-    # =========================================================
-    # GET STATUS
-    # =========================================================
-
-    def get_status(self):
-
-        return {
-
-            "available": self.available,
-
-            "model": self.model
-
-        }
+            return f"Ollama error: {str(e)}"
