@@ -1,5 +1,5 @@
 """
-Memory Management - Memory 4.0
+Memory Management - Memory 5.0
 
 Provides:
 
@@ -8,6 +8,8 @@ Provides:
 - Semantic memory
 - Event memory
 - Fast relevant memory retrieval
+- SQLite connection optimization
+- In-memory caching for frequently accessed memory
 """
 
 import sqlite3
@@ -26,7 +28,14 @@ logger = setup_logger(__name__)
 class MemoryManager:
 
     """
-    Advanced persistent memory system.
+    Fast persistent memory system.
+
+    Uses:
+
+    - SQLite for permanent storage
+    - In-memory cache for frequently accessed data
+    - Single-query retrieval where possible
+    - WAL mode for better SQLite performance
     """
 
     def __init__(
@@ -39,7 +48,72 @@ class MemoryManager:
 
         self.db_path = db_path
 
+        # =====================================================
+        # MEMORY CACHE
+        # =====================================================
+
+        self.profile_cache = {}
+
+        self.semantic_cache = {
+
+            "likes": [],
+
+            "dislikes": [],
+
+            "interests": []
+
+        }
+
+        self.events_cache = []
+
+        self.cache_loaded = False
+
+        # =====================================================
+        # DATABASE
+        # =====================================================
+
         self._ensure_db_exists()
+
+        self._load_cache()
+
+    # =========================================================
+    # DATABASE CONNECTION
+    # =========================================================
+
+    def _connect(self):
+
+        """
+
+        Creates an optimized SQLite connection.
+        """
+
+        conn = sqlite3.connect(
+
+            self.db_path,
+
+            timeout=10
+
+        )
+
+        conn.execute(
+
+            "PRAGMA journal_mode=WAL"
+
+        )
+
+        conn.execute(
+
+            "PRAGMA synchronous=NORMAL"
+
+        )
+
+        conn.execute(
+
+            "PRAGMA cache_size=-10000"
+
+        )
+
+        return conn
 
     # =========================================================
     # DATABASE INITIALIZATION
@@ -59,11 +133,7 @@ class MemoryManager:
 
         )
 
-        with sqlite3.connect(
-
-            self.db_path
-
-        ) as conn:
+        with self._connect() as conn:
 
             cursor = conn.cursor()
 
@@ -165,9 +235,17 @@ class MemoryManager:
 
             cursor.execute("""
 
+                CREATE INDEX IF NOT EXISTS idx_semantic_value
+
+                ON semantic_memory(value)
+
+            """)
+
+            cursor.execute("""
+
                 CREATE INDEX IF NOT EXISTS idx_events_importance
 
-                ON events(importance DESC)
+                ON events(importance DESC, id DESC)
 
             """)
 
@@ -181,11 +259,158 @@ class MemoryManager:
 
             conn.commit()
 
+        logger.info(
+
+            "Memory database initialized."
+
+        )
+
+    # =========================================================
+    # LOAD CACHE
+    # =========================================================
+
+    def _load_cache(self):
+
+        """
+
+        Loads frequently accessed memory into RAM.
+
+        This means normal profile and semantic memory retrieval
+        does not need to access SQLite every time.
+        """
+
+        try:
+
+            with self._connect() as conn:
+
+                cur = conn.cursor()
+
+                # -------------------------------------------------
+                # PROFILE
+                # -------------------------------------------------
+
+                cur.execute("""
+
+                    SELECT key, value
+
+                    FROM user_profile
+
+                """)
+
+                self.profile_cache = dict(
+
+                    cur.fetchall()
+
+                )
+
+                # -------------------------------------------------
+                # SEMANTIC MEMORY
+                # -------------------------------------------------
+
+                cur.execute("""
+
+                    SELECT category, value
+
+                    FROM semantic_memory
+
+                    ORDER BY weight DESC
+
+                """)
+
+                self.semantic_cache = {
+
+                    "likes": [],
+
+                    "dislikes": [],
+
+                    "interests": []
+
+                }
+
+                for category, value in cur.fetchall():
+
+                    if category in self.semantic_cache:
+
+                        self.semantic_cache[
+
+                            category
+
+                        ].append(
+
+                            value
+
+                        )
+
+                # -------------------------------------------------
+                # EVENTS
+                # -------------------------------------------------
+
+                cur.execute("""
+
+                    SELECT
+
+                        type,
+
+                        content,
+
+                        importance,
+
+                        timestamp
+
+                    FROM events
+
+                    ORDER BY importance DESC, id DESC
+
+                    LIMIT 20
+
+                """)
+
+                self.events_cache = [
+
+                    {
+
+                        "type": row[0],
+
+                        "content": row[1],
+
+                        "importance": row[2],
+
+                        "timestamp": row[3]
+
+                    }
+
+                    for row in cur.fetchall()
+
+                ]
+
+            self.cache_loaded = True
+
             logger.info(
 
-                "Memory database initialized."
+                "Memory cache loaded."
 
             )
+
+        except Exception as e:
+
+            logger.error(
+
+                f"Memory cache loading failed: {e}"
+
+            )
+
+    # =========================================================
+    # REFRESH CACHE
+    # =========================================================
+
+    def _refresh_cache(self):
+
+        """
+
+        Refreshes cached memory after a database update.
+        """
+
+        self._load_cache()
 
     # =========================================================
     # PROFILE MEMORY
@@ -205,11 +430,17 @@ class MemoryManager:
 
             return
 
-        with sqlite3.connect(
+        key = key.strip()
 
-            self.db_path
+        value = str(value).strip()
 
-        ) as conn:
+        if not key or not value:
+
+            return
+
+        now = datetime.now().isoformat()
+
+        with self._connect() as conn:
 
             conn.execute("""
 
@@ -241,17 +472,21 @@ class MemoryManager:
 
                 value,
 
-                datetime.now().isoformat()
+                now
 
             ))
 
             conn.commit()
 
-            logger.info(
+        # Update RAM cache immediately
 
-                f"Profile memory updated: {key}"
+        self.profile_cache[key] = value
 
-            )
+        logger.info(
+
+            f"Profile memory updated: {key}"
+
+        )
 
     # =========================================================
     # GET PROFILE
@@ -265,45 +500,15 @@ class MemoryManager:
 
     ) -> Optional[str]:
 
-        with sqlite3.connect(
+        if not key:
 
-            self.db_path
+            return None
 
-        ) as conn:
+        return self.profile_cache.get(
 
-            cur = conn.cursor()
+            key
 
-            cur.execute(
-
-                """
-
-                SELECT value
-
-                FROM user_profile
-
-                WHERE key = ?
-
-                """,
-
-                (
-
-                    key,
-
-                )
-
-            )
-
-            row = cur.fetchone()
-
-            return (
-
-                row[0]
-
-                if row
-
-                else None
-
-            )
+        )
 
     # =========================================================
     # GET ALL PROFILE
@@ -315,31 +520,11 @@ class MemoryManager:
 
     ) -> Dict:
 
-        with sqlite3.connect(
+        return dict(
 
-            self.db_path
+            self.profile_cache
 
-        ) as conn:
-
-            cur = conn.cursor()
-
-            cur.execute(
-
-                """
-
-                SELECT key, value
-
-                FROM user_profile
-
-                """
-
-            )
-
-            return dict(
-
-                cur.fetchall()
-
-            )
+        )
 
     # =========================================================
     # SEMANTIC MEMORY
@@ -359,25 +544,21 @@ class MemoryManager:
 
             return
 
-        value = value.strip()
+        value = str(value).strip()
 
         if not value:
 
             return
 
-        with sqlite3.connect(
+        now = datetime.now().isoformat()
 
-            self.db_path
-
-        ) as conn:
+        with self._connect() as conn:
 
             cur = conn.cursor()
 
-            cur.execute(
+            cur.execute("""
 
-                """
-
-                SELECT weight
+                SELECT id
 
                 FROM semantic_memory
 
@@ -385,25 +566,19 @@ class MemoryManager:
 
                 AND value = ?
 
-                """,
+            """, (
 
-                (
+                category,
 
-                    category,
+                value
 
-                    value
-
-                )
-
-            )
+            ))
 
             row = cur.fetchone()
 
             if row:
 
-                cur.execute(
-
-                    """
+                cur.execute("""
 
                     UPDATE semantic_memory
 
@@ -413,29 +588,19 @@ class MemoryManager:
 
                         last_used = ?
 
-                    WHERE category = ?
+                    WHERE id = ?
 
-                    AND value = ?
+                """, (
 
-                    """,
+                    now,
 
-                    (
+                    row[0]
 
-                        datetime.now().isoformat(),
-
-                        category,
-
-                        value
-
-                    )
-
-                )
+                ))
 
             else:
 
-                cur.execute(
-
-                    """
+                cur.execute("""
 
                     INSERT INTO semantic_memory
 
@@ -453,21 +618,41 @@ class MemoryManager:
 
                     VALUES (?, ?, 1, ?)
 
-                    """,
+                """, (
 
-                    (
+                    category,
 
-                        category,
+                    value,
 
-                        value,
+                    now
 
-                        datetime.now().isoformat()
-
-                    )
-
-                )
+                ))
 
             conn.commit()
+
+        # Update cache directly
+
+        if category not in self.semantic_cache:
+
+            self.semantic_cache[category] = []
+
+        if value not in self.semantic_cache[category]:
+
+            self.semantic_cache[category].insert(
+
+                0,
+
+                value
+
+            )
+
+        logger.info(
+
+            f"Semantic memory updated: "
+
+            f"{category} -> {value}"
+
+        )
 
     # =========================================================
     # GET SEMANTIC MEMORY
@@ -481,45 +666,17 @@ class MemoryManager:
 
     ) -> List[str]:
 
-        with sqlite3.connect(
+        return list(
 
-            self.db_path
+            self.semantic_cache.get(
 
-        ) as conn:
+                category,
 
-            cur = conn.cursor()
-
-            cur.execute(
-
-                """
-
-                SELECT value
-
-                FROM semantic_memory
-
-                WHERE category = ?
-
-                ORDER BY weight DESC
-
-                LIMIT 50
-
-                """,
-
-                (
-
-                    category,
-
-                )
+                []
 
             )
 
-            return [
-
-                row[0]
-
-                for row in cur.fetchall()
-
-            ]
+        )[:50]
 
     # =========================================================
     # GET ALL SEMANTIC MEMORY
@@ -533,29 +690,23 @@ class MemoryManager:
 
         return {
 
-            "likes":
+            "likes": self.get_semantic_memory(
 
-                self.get_semantic_memory(
+                "likes"
 
-                    "likes"
+            ),
 
-                ),
+            "dislikes": self.get_semantic_memory(
 
-            "dislikes":
+                "dislikes"
 
-                self.get_semantic_memory(
+            ),
 
-                    "dislikes"
+            "interests": self.get_semantic_memory(
 
-                ),
+                "interests"
 
-            "interests":
-
-                self.get_semantic_memory(
-
-                    "interests"
-
-                )
+            )
 
         }
 
@@ -579,15 +730,11 @@ class MemoryManager:
 
             return
 
-        with sqlite3.connect(
+        now = datetime.now().isoformat()
 
-            self.db_path
+        with self._connect() as conn:
 
-        ) as conn:
-
-            conn.execute(
-
-                """
+            conn.execute("""
 
                 INSERT INTO events
 
@@ -605,23 +752,55 @@ class MemoryManager:
 
                 VALUES (?, ?, ?, ?)
 
-                """,
+            """, (
 
-                (
+                type,
 
-                    type,
+                content,
 
-                    content,
+                importance,
 
-                    importance,
+                now
 
-                    datetime.now().isoformat()
-
-                )
-
-            )
+            ))
 
             conn.commit()
+
+        # Add to cache
+
+        self.events_cache.insert(
+
+            0,
+
+            {
+
+                "type": type,
+
+                "content": content,
+
+                "importance": importance,
+
+                "timestamp": now
+
+            }
+
+        )
+
+        self.events_cache = sorted(
+
+            self.events_cache,
+
+            key=lambda event: (
+
+                event["importance"],
+
+                event["timestamp"]
+
+            ),
+
+            reverse=True
+
+        )[:20]
 
     # =========================================================
     # GET EVENTS
@@ -635,61 +814,7 @@ class MemoryManager:
 
     ) -> List[Dict]:
 
-        with sqlite3.connect(
-
-            self.db_path
-
-        ) as conn:
-
-            cur = conn.cursor()
-
-            cur.execute(
-
-                """
-
-                SELECT
-
-                    type,
-
-                    content,
-
-                    importance,
-
-                    timestamp
-
-                FROM events
-
-                ORDER BY importance DESC, id DESC
-
-                LIMIT ?
-
-                """,
-
-                (
-
-                    limit,
-
-                )
-
-            )
-
-            return [
-
-                {
-
-                    "type": row[0],
-
-                    "content": row[1],
-
-                    "importance": row[2],
-
-                    "timestamp": row[3]
-
-                }
-
-                for row in cur.fetchall()
-
-            ]
+        return self.events_cache[:limit]
 
     # =========================================================
     # FAST RELEVANT MEMORY RETRIEVAL
@@ -705,9 +830,14 @@ class MemoryManager:
 
         """
 
-        Retrieves memory relevant to the current query.
+        Extremely fast memory retrieval.
 
-        Uses a single SQLite connection to reduce overhead.
+        Profile, semantic memory and events are already
+        cached in RAM.
+
+        No SQLite query is performed here.
+
+        This is the main performance improvement.
         """
 
         if not text:
@@ -728,11 +858,11 @@ class MemoryManager:
 
         text = text.lower()
 
-        # -------------------------------------------------
-        # EXTRACT SEARCH TERMS
-        # -------------------------------------------------
+        # -----------------------------------------------------
+        # TOKENIZE QUERY
+        # -----------------------------------------------------
 
-        words = [
+        words = {
 
             word.strip(
 
@@ -752,179 +882,86 @@ class MemoryManager:
 
             ) > 2
 
-        ]
+        }
 
-        # Remove duplicates while preserving order
+        # -----------------------------------------------------
+        # FAST MEMORY MATCHING
+        # -----------------------------------------------------
 
-        words = list(
+        relevant = {
 
-            dict.fromkeys(
+            "likes": [],
 
-                words
+            "dislikes": [],
 
-            )
+            "interests": []
 
-        )
+        }
 
-        with sqlite3.connect(
+        for category, values in self.semantic_cache.items():
 
-            self.db_path
+            for value in values:
 
-        ) as conn:
+                value_lower = value.lower()
 
-            cur = conn.cursor()
+                if (
 
-            # -------------------------------------------------
-            # PROFILE
-            # -------------------------------------------------
+                    value_lower in text
 
-            cur.execute(
+                    or any(
 
-                """
+                        word in value_lower
 
-                SELECT key, value
-
-                FROM user_profile
-
-                """
-
-            )
-
-            profile = dict(
-
-                cur.fetchall()
-
-            )
-
-            # -------------------------------------------------
-            # SEMANTIC MEMORY
-            # -------------------------------------------------
-
-            semantic = {
-
-                "likes": [],
-
-                "dislikes": [],
-
-                "interests": []
-
-            }
-
-            if words:
-
-                conditions = " OR ".join(
-
-                    [
-
-                        "LOWER(value) LIKE ?"
-
-                        for _ in words
-
-                    ]
-
-                )
-
-                search_values = [
-
-                    f"%{word}%"
-
-                    for word in words
-
-                ]
-
-                for category in semantic:
-
-                    cur.execute(
-
-                        f"""
-
-                        SELECT value
-
-                        FROM semantic_memory
-
-                        WHERE category = ?
-
-                        AND ({conditions})
-
-                        ORDER BY weight DESC
-
-                        LIMIT 5
-
-                        """,
-
-                        [
-
-                            category
-
-                        ] + search_values
+                        for word in words
 
                     )
 
-                    semantic[category] = [
+                ):
 
-                        row[0]
+                    relevant[category].append(
 
-                        for row in cur.fetchall()
+                        value
 
-                    ]
+                    )
 
-            # -------------------------------------------------
-            # EVENTS
-            # -------------------------------------------------
+        # -----------------------------------------------------
+        # IF NO SPECIFIC MATCHES
+        # -----------------------------------------------------
 
-            cur.execute(
+        # Give the assistant a small amount of
+        # general memory context.
 
-                """
+        for category in relevant:
 
-                SELECT
+            if not relevant[category]:
 
-                    type,
+                relevant[category] = (
 
-                    content,
+                    self.semantic_cache.get(
 
-                    importance,
+                        category,
 
-                    timestamp
+                        []
 
-                FROM events
+                    )[:5]
 
-                ORDER BY importance DESC, id DESC
-
-                LIMIT 5
-
-                """
-
-            )
-
-            events = [
-
-                {
-
-                    "type": row[0],
-
-                    "content": row[1],
-
-                    "importance": row[2],
-
-                    "timestamp": row[3]
-
-                }
-
-                for row in cur.fetchall()
-
-            ]
+                )
 
         return {
 
-            "profile": profile,
+            "profile": dict(
 
-            "events": events,
+                self.profile_cache
 
-            "likes": semantic["likes"],
+            ),
 
-            "dislikes": semantic["dislikes"],
+            "events": self.events_cache[:5],
 
-            "interests": semantic["interests"]
+            "likes": relevant["likes"][:5],
+
+            "dislikes": relevant["dislikes"][:5],
+
+            "interests": relevant["interests"][:5]
 
         }
 
@@ -946,6 +983,10 @@ class MemoryManager:
 
         t = text.lower()
 
+        # -----------------------------------------------------
+        # NAME
+        # -----------------------------------------------------
+
         if "my name is" in t:
 
             name = text.split(
@@ -965,6 +1006,10 @@ class MemoryManager:
                     name
 
                 )
+
+        # -----------------------------------------------------
+        # LIKES
+        # -----------------------------------------------------
 
         if "i like" in t:
 
@@ -986,6 +1031,10 @@ class MemoryManager:
 
                 )
 
+        # -----------------------------------------------------
+        # DISLIKES
+        # -----------------------------------------------------
+
         if "i hate" in t:
 
             value = text.split(
@@ -1005,6 +1054,10 @@ class MemoryManager:
                     value
 
                 )
+
+        # -----------------------------------------------------
+        # INTERESTS
+        # -----------------------------------------------------
 
         for word in [
 
@@ -1048,15 +1101,9 @@ class MemoryManager:
 
     ):
 
-        with sqlite3.connect(
+        with self._connect() as conn:
 
-            self.db_path
-
-        ) as conn:
-
-            conn.execute(
-
-                """
+            conn.execute("""
 
                 INSERT INTO conversations
 
@@ -1074,43 +1121,39 @@ class MemoryManager:
 
                 VALUES (?, ?, ?, ?)
 
-                """,
+            """, (
 
-                (
+                exchange.get(
+
+                    "timestamp"
+
+                ),
+
+                exchange.get(
+
+                    "user"
+
+                ),
+
+                exchange.get(
+
+                    "assistant"
+
+                ),
+
+                json.dumps(
 
                     exchange.get(
 
-                        "timestamp"
+                        "metadata",
 
-                    ),
-
-                    exchange.get(
-
-                        "user"
-
-                    ),
-
-                    exchange.get(
-
-                        "assistant"
-
-                    ),
-
-                    json.dumps(
-
-                        exchange.get(
-
-                            "metadata",
-
-                            {}
-
-                        )
+                        {}
 
                     )
 
                 )
 
-            )
+            ))
 
             conn.commit()
 
@@ -1126,17 +1169,11 @@ class MemoryManager:
 
     ):
 
-        with sqlite3.connect(
-
-            self.db_path
-
-        ) as conn:
+        with self._connect() as conn:
 
             cur = conn.cursor()
 
-            cur.execute(
-
-                """
+            cur.execute("""
 
                 SELECT
 
@@ -1152,41 +1189,37 @@ class MemoryManager:
 
                 LIMIT ?
 
-                """,
+            """, (
 
-                (
+                limit,
 
-                    limit,
-
-                )
-
-            )
+            ))
 
             rows = cur.fetchall()
 
-            return list(
+        return list(
 
-                reversed(
+            reversed(
 
-                    [
+                [
 
-                        {
+                    {
 
-                            "timestamp": row[0],
+                        "timestamp": row[0],
 
-                            "user": row[1],
+                        "user": row[1],
 
-                            "assistant": row[2]
+                        "assistant": row[2]
 
-                        }
+                    }
 
-                        for row in rows
+                    for row in rows
 
-                    ]
-
-                )
+                ]
 
             )
+
+        )
 
     # =========================================================
     # CLEAR HISTORY
@@ -1198,11 +1231,7 @@ class MemoryManager:
 
     ):
 
-        with sqlite3.connect(
-
-            self.db_path
-
-        ) as conn:
+        with self._connect() as conn:
 
             conn.execute(
 
@@ -1212,8 +1241,8 @@ class MemoryManager:
 
             conn.commit()
 
-            logger.info(
+        logger.info(
 
-                "Conversation history cleared."
+            "Conversation history cleared."
 
-            )
+        )
