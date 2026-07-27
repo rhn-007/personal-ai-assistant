@@ -23,7 +23,7 @@ class OllamaIntegration:
 
     def __init__(
         self,
-        model="phi3"
+        model="qwen2.5:7b"
     ):
 
         self.model = model
