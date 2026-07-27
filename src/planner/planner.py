@@ -8,6 +8,32 @@ class Planner:
         self.tool_manager = tool_manager
 
     # =====================================================
+    # HELPER METHODS
+    # =====================================================
+
+    def _contains_any(self, text, phrases):
+
+        return any(
+            phrase in text
+            for phrase in phrases
+        )
+
+    def _create_step(
+        self,
+        tool,
+        action,
+        query
+    ):
+
+        return {
+            "tool": tool,
+            "action": action,
+            "input": {
+                "query": query
+            }
+        }
+
+    # =====================================================
     # CREATE PLAN
     # =====================================================
 
@@ -17,110 +43,70 @@ class Planner:
 
             return None
 
-        t = query.lower().strip()
+        original_query = query.strip()
+
+        if not original_query:
+
+            return None
+
+        t = original_query.lower()
 
         plan = []
 
-        # =====================================================
-        # BROWSER SUMMARY FOLLOW-UP INTENT
-        #
-        # IMPORTANT:
-        # This must come BEFORE all other intents.
-        #
-        # Examples:
-        # - give a longer summary
-        # - give a longer summary in about 200 words
-        # - make the summary longer
-        # - expand the summary
-        # - make it more detailed
-        # =====================================================
+        # =================================================
+        # BROWSER - SUMMARY FOLLOW-UP
+        # =================================================
 
         summary_follow_up_phrases = [
 
             "longer summary",
-
             "longer summarize",
-
             "give a longer summary",
-
             "give me a longer summary",
-
             "expand the summary",
-
             "expand that summary",
-
             "make the summary longer",
-
             "make it longer",
-
             "make the summary more detailed",
-
             "more detailed summary",
-
             "expand it",
-
             "elaborate on the summary",
-
             "explain the summary in more detail",
-
             "give more details"
 
         ]
 
-        is_summary_follow_up = any(
-
-            phrase in t
-
-            for phrase in summary_follow_up_phrases
-
-        )
-
-        # Detect requests containing a word count
-        #
-        # Examples:
-        # - give me a 200 word summary
-        # - make it around 300 words
-        # - summarize it in 250 words
-
         contains_word_count = bool(
 
             re.search(
-
                 r"\b\d+\s*words?\b",
-
                 t
-
             )
 
         )
 
-        summary_context_words = [
+        contains_summary_context = self._contains_any(
 
-            "summary",
+            t,
 
-            "summarize",
+            [
 
-            "summarise",
+                "summary",
+                "summarize",
+                "summarise",
+                "summarization",
+                "summarisation"
 
-            "summarization",
-
-            "summarisation"
-
-        ]
-
-        contains_summary_context = any(
-
-            word in t
-
-            for word in summary_context_words
+            ]
 
         )
 
-        # Route summary follow-ups to summarize_last
-
         if (
 
-            is_summary_follow_up
+            self._contains_any(
+                t,
+                summary_follow_up_phrases
+            )
 
             or (
 
@@ -128,13 +114,9 @@ class Planner:
 
                 and contains_summary_context
 
-                and not (
+                and "http://" not in t
 
-                    "http://" in t
-
-                    or "https://" in t
-
-                )
+                and "https://" not in t
 
             )
 
@@ -142,48 +124,42 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "browser",
+                    "browser",
+                    "summarize_last",
+                    original_query
 
-                    "action": "summarize_last",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
             return plan
 
-        # =====================================================
-        # BROWSER SEARCH RESULT INTENT
-        # =====================================================
+        # =================================================
+        # BROWSER - OPEN / READ SEARCH RESULT
+        # =================================================
 
         if (
 
-            (
+            self._contains_any(
 
-                "open result" in t
+                t,
 
-                or "read result" in t
+                [
 
-                or "open search result" in t
+                    "open result",
+                    "read result",
+                    "open search result",
+                    "read search result"
 
-                or "read search result" in t
+                ]
 
             )
 
             and any(
-
                 char.isdigit()
-
                 for char in t
-
             )
 
         ):
@@ -191,7 +167,6 @@ class Planner:
             number_match = re.search(
 
                 r"\b(\d+)\b",
-
                 t
 
             )
@@ -202,65 +177,52 @@ class Planner:
 
             result_number = number_match.group(1)
 
-            # ---------------------------------------------
-            # READ RESULT
-            # ---------------------------------------------
+            if self._contains_any(
 
-            if (
+                t,
 
-                "read result" in t
+                [
 
-                or "read search result" in t
+                    "read result",
+                    "read search result"
+
+                ]
 
             ):
 
                 plan.append(
 
-                    {
+                    self._create_step(
 
-                        "tool": "browser",
+                        "browser",
+                        "read_result",
+                        result_number
 
-                        "action": "read_result",
-
-                        "input": {
-
-                            "query": result_number
-
-                        }
-
-                    }
+                    )
 
                 )
-
-            # ---------------------------------------------
-            # OPEN RESULT
-            # ---------------------------------------------
 
             else:
 
                 plan.append(
 
-                    {
+                    self._create_step(
 
-                        "tool": "browser",
+                        "browser",
+                        "open_result",
+                        result_number
 
-                        "action": "open_result",
-
-                        "input": {
-
-                            "query": result_number
-
-                        }
-
-                    }
+                    )
 
                 )
 
-        # =====================================================
-        # BROWSER SUMMARIZE NEW WEBPAGE INTENT
-        # =====================================================
+            return plan
 
-        elif (
+        # =================================================
+        # BROWSER - SUMMARIZE WEBPAGE
+        # =================================================
+
+        if (
 
             t.startswith("summarize ")
 
@@ -274,27 +236,23 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "browser",
+                    "browser",
+                    "summarize",
+                    original_query
 
-                    "action": "summarize",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
-        # BROWSER READ INTENT
-        # =====================================================
+            return plan
 
-        elif (
+        # =================================================
+        # BROWSER - READ WEBPAGE
+        # =================================================
+
+        if (
 
             t.startswith("read ")
 
@@ -312,14 +270,13 @@ class Planner:
 
                 "https://" in t
 
-                and any(
+                and self._contains_any(
 
-                    word in t
+                    t,
 
-                    for word in [
+                    [
 
                         "read",
-
                         "extract"
 
                     ]
@@ -332,40 +289,32 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "browser",
+                    "browser",
+                    "read",
+                    original_query
 
-                    "action": "read",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
-        # BROWSER SEARCH INTENT
-        # =====================================================
+            return plan
 
-        elif any(
+        # =================================================
+        # BROWSER - SEARCH
+        # =================================================
 
-            phrase in t
+        if self._contains_any(
 
-            for phrase in [
+            t,
+
+            [
 
                 "search for",
-
                 "search",
-
                 "look up",
-
                 "find online",
-
                 "google"
 
             ]
@@ -374,60 +323,42 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "browser",
+                    "browser",
+                    "search",
+                    original_query
 
-                    "action": "search",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
-        # BROWSER OPEN INTENT
-        # =====================================================
+            return plan
 
-        elif any(
+        # =================================================
+        # BROWSER - OPEN WEBSITE
+        # =================================================
 
-            phrase in t
+        if self._contains_any(
 
-            for phrase in [
+            t,
+
+            [
 
                 "open youtube",
-
                 "open google",
-
                 "open github",
-
                 "open wikipedia",
-
                 "open chatgpt",
-
                 "open reddit",
-
                 "open instagram",
-
                 "open facebook",
-
                 "open twitter",
-
                 "open x",
-
                 "open website",
-
                 "open browser",
-
                 "go to",
-
                 "visit",
-
                 "browse"
 
             ]
@@ -436,165 +367,32 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "browser",
+                    "browser",
+                    "open",
+                    original_query
 
-                    "action": "open",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
-        # CALENDAR INTENT
-        # =====================================================
+            return plan
 
-        elif any(
+        # =================================================
+        # SPOTIFY - PAUSE
+        # =================================================
 
-            word in t
+        if self._contains_any(
 
-            for word in [
+            t,
 
-                "calendar",
+            [
 
-                "schedule",
-
-                "meeting",
-
-                "reminder",
-
-                "event"
-
-            ]
-
-        ):
-
-            # ---------------------------------------------
-            # DELETE EVENT
-            # ---------------------------------------------
-
-            if any(
-
-                word in t
-
-                for word in [
-
-                    "delete",
-
-                    "remove",
-
-                    "cancel"
-
-                ]
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "delete",
-
-                        "input": {
-
-                            "query": query
-
-                        }
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # SHOW CALENDAR
-            # ---------------------------------------------
-
-            elif any(
-
-                word in t
-
-                for word in [
-
-                    "show",
-
-                    "list",
-
-                    "view",
-
-                    "what do i have",
-
-                    "what's on"
-
-                ]
-
-            ):
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "list",
-
-                        "input": {}
-
-                    }
-
-                )
-
-            # ---------------------------------------------
-            # CREATE EVENT
-            # ---------------------------------------------
-
-            else:
-
-                plan.append(
-
-                    {
-
-                        "tool": "calendar",
-
-                        "action": "create",
-
-                        "input": {
-
-                            "query": query
-
-                        }
-
-                    }
-
-                )
-
-        # =====================================================
-        # SPOTIFY INTENT
-        # =====================================================
-
-        elif any(
-
-            word in t
-
-            for word in [
-
-                "spotify",
-
-                "play",
-
-                "song",
-
-                "music",
-
-                "audio"
+                "pause music",
+                "pause song",
+                "pause spotify",
+                "pause playback"
 
             ]
 
@@ -602,40 +400,279 @@ class Planner:
 
             plan.append(
 
+                self._create_step(
+
+                    "spotify",
+                    "pause",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # SPOTIFY - NEXT
+        # =================================================
+
+        if self._contains_any(
+
+            t,
+
+            [
+
+                "next song",
+                "next track",
+                "skip song",
+                "skip track"
+
+            ]
+
+        ):
+
+            plan.append(
+
+                self._create_step(
+
+                    "spotify",
+                    "next",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # SPOTIFY - PREVIOUS
+        # =================================================
+
+        if self._contains_any(
+
+            t,
+
+            [
+
+                "previous song",
+                "previous track",
+                "last song",
+                "go back"
+
+            ]
+
+        ):
+
+            plan.append(
+
+                self._create_step(
+
+                    "spotify",
+                    "previous",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # SPOTIFY - PLAY
+        # =================================================
+
+        if self._contains_any(
+
+            t,
+
+            [
+
+                "spotify",
+                "play music",
+                "play song",
+                "play ",
+                "listen to",
+                "put on some music"
+
+            ]
+
+        ):
+
+            plan.append(
+
+                self._create_step(
+
+                    "spotify",
+                    "play",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # CALENDAR - DELETE
+        # =================================================
+
+        if (
+
+            self._contains_any(
+
+                t,
+
+                [
+
+                    "calendar",
+                    "schedule",
+                    "meeting",
+                    "reminder",
+                    "event",
+                    "appointment"
+
+                ]
+
+            )
+
+            and self._contains_any(
+
+                t,
+
+                [
+
+                    "delete",
+                    "remove",
+                    "cancel"
+
+                ]
+
+            )
+
+        ):
+
+            plan.append(
+
+                self._create_step(
+
+                    "calendar",
+                    "delete",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # CALENDAR - LIST
+        # =================================================
+
+        if (
+
+            self._contains_any(
+
+                t,
+
+                [
+
+                    "calendar",
+                    "schedule",
+                    "reminder",
+                    "event",
+                    "appointment"
+
+                ]
+
+            )
+
+            and self._contains_any(
+
+                t,
+
+                [
+
+                    "show",
+                    "list",
+                    "view",
+                    "what do i have",
+                    "what's on",
+                    "whats on"
+
+                ]
+
+            )
+
+        ):
+
+            plan.append(
+
                 {
 
-                    "tool": "spotify",
+                    "tool": "calendar",
 
-                    "action": "play",
+                    "action": "list",
 
-                    "input": {
-
-                        "query": query
-
-                    }
+                    "input": {}
 
                 }
 
             )
 
-        # =====================================================
-        # SYSTEM INTENT
-        # =====================================================
+            return plan
 
-        elif any(
+        # =================================================
+        # CALENDAR - CREATE
+        # =================================================
 
-            word in t
+        if self._contains_any(
 
-            for word in [
+            t,
+
+            [
+
+                "calendar",
+                "schedule",
+                "meeting",
+                "reminder",
+                "event",
+                "appointment",
+                "remind me"
+
+            ]
+
+        ):
+
+            plan.append(
+
+                self._create_step(
+
+                    "calendar",
+                    "create",
+                    original_query
+
+                )
+
+            )
+
+            return plan
+
+        # =================================================
+        # SYSTEM - OPEN APPLICATION OR FOLDER
+        # =================================================
+
+        if self._contains_any(
+
+            t,
+
+            [
 
                 "open",
-
                 "launch",
-
                 "start",
-
                 "folder",
-
                 "file"
 
             ]
@@ -644,39 +681,33 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "system",
+                    "system",
+                    "open",
+                    original_query
 
-                    "action": "open",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
-        # EMAIL INTENT
-        # =====================================================
+            return plan
 
-        elif any(
+        # =================================================
+        # EMAIL
+        # =================================================
 
-            word in t
+        if self._contains_any(
 
-            for word in [
+            t,
+
+            [
 
                 "email",
-
                 "mail",
-
                 "gmail",
-
-                "inbox"
+                "inbox",
+                "from:"
 
             ]
 
@@ -684,28 +715,21 @@ class Planner:
 
             plan.append(
 
-                {
+                self._create_step(
 
-                    "tool": "email",
+                    "email",
+                    "default",
+                    original_query
 
-                    "action": "default",
-
-                    "input": {
-
-                        "query": query
-
-                    }
-
-                }
+                )
 
             )
 
-        # =====================================================
+            return plan
+
+        # =================================================
         # FALLBACK
-        # =====================================================
+        # =================================================
 
-        else:
-
-            return None
-
-        return plan
+        return None
+    
