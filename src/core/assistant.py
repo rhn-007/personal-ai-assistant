@@ -1,29 +1,27 @@
 """
 Main Assistant Class
-Memory + Tool System + Planner + Agent Loop
 
-Architecture:
-
-User Input
-    ↓
-Memory Capture
-    ↓
-Tool Execution
-    ↓
-Conversation Memory
-    ↓
-Ollama LLM Fallback
+Memory
++ Tool System
++ Planner
++ Agent Loop
++ Conversation History
++ Ollama LLM
 """
 
 from dotenv import load_dotenv
 
+
 from src.core.conversation import ConversationManager
 from src.core.memory import MemoryManager
+
 
 from src.integrations.ollama import OllamaIntegration
 from src.integrations.email import EmailIntegration
 
+
 from src.utils.logger import setup_logger
+
 
 from src.tools.system_tool import SystemTool
 from src.tools.tool_manager import ToolManager
@@ -32,7 +30,9 @@ from src.tools.spotify_tool import SpotifyTool
 from src.tools.calendar_tool import CalendarTool
 from src.tools.browser_tool import BrowserTool
 
+
 from src.planner.planner import Planner
+
 
 from src.agent.task_manager import TaskManager
 from src.agent.agent_loop import AgentLoop
@@ -44,9 +44,12 @@ load_dotenv()
 class PersonalAssistant:
 
     """
-    AI Assistant with:
+    Personal AI Assistant
+
+    Includes:
 
     - Conversation memory
+    - Persistent conversation history
     - Semantic memory
     - User profile memory
     - Ollama LLM
@@ -62,7 +65,7 @@ class PersonalAssistant:
     def __init__(self):
 
         # =====================================================
-        # ASSISTANT STATUS
+        # STATUS
         # =====================================================
 
         self.status = "INITIALIZING"
@@ -71,26 +74,42 @@ class PersonalAssistant:
         # LOGGER
         # =====================================================
 
-        self.logger = setup_logger(__name__)
+        self.logger = setup_logger(
+
+            __name__
+
+        )
 
         self.logger.info(
+
             "Initializing Assistant..."
+
         )
 
         # =====================================================
-        # CORE SYSTEMS
+        # MEMORY
         # =====================================================
 
         self.memory = MemoryManager()
 
+        # =====================================================
+        # CONVERSATION MANAGER
+        # =====================================================
+
         self.conversation = ConversationManager(
+
             self.memory
+
         )
+
+        # =====================================================
+        # OLLAMA
+        # =====================================================
 
         self.llm = OllamaIntegration()
 
         # =====================================================
-        # EMAIL SYSTEM
+        # EMAIL
         # =====================================================
 
         try:
@@ -98,7 +117,9 @@ class PersonalAssistant:
             self.email = EmailIntegration()
 
             self.logger.info(
+
                 "Email integration initialized."
+
             )
 
         except Exception as e:
@@ -106,7 +127,9 @@ class PersonalAssistant:
             self.email = None
 
             self.logger.warning(
+
                 f"Email integration unavailable: {e}"
+
             )
 
         # =====================================================
@@ -124,7 +147,7 @@ class PersonalAssistant:
         }
 
         # =====================================================
-        # TOOL SYSTEM
+        # TOOL MANAGER
         # =====================================================
 
         self.tool_manager = ToolManager()
@@ -134,25 +157,37 @@ class PersonalAssistant:
         # =====================================================
 
         self.tool_manager.register(
+
             EmailTool()
+
         )
 
         self.tool_manager.register(
+
             SpotifyTool()
+
         )
 
         self.tool_manager.register(
+
             CalendarTool()
+
         )
 
         self.tool_manager.register(
+
             SystemTool()
+
         )
 
         self.tool_manager.register(
+
             BrowserTool(
+
                 llm=self.llm
+
             )
+
         )
 
         # =====================================================
@@ -160,18 +195,26 @@ class PersonalAssistant:
         # =====================================================
 
         self.planner = Planner(
+
             self.tool_manager
+
         )
 
         self.tool_manager.set_planner(
+
             self.planner
+
         )
 
         # =====================================================
-        # AGENT SYSTEM
+        # TASK MANAGER
         # =====================================================
 
         self.task_manager = TaskManager()
+
+        # =====================================================
+        # AGENT LOOP
+        # =====================================================
 
         self.agent_loop = AgentLoop(
 
@@ -184,13 +227,15 @@ class PersonalAssistant:
         )
 
         # =====================================================
-        # ASSISTANT READY
+        # READY
         # =====================================================
 
         self.status = "READY"
 
         self.logger.info(
+
             "Assistant ready."
+
         )
 
     # =========================================================
@@ -206,13 +251,24 @@ class PersonalAssistant:
     # =========================================================
 
     def _get_memory_context(
+
         self,
+
         query: str
+
     ):
 
-        profile = self.memory.get_all_profile()
+        profile = (
 
-        semantic = self.memory.get_all_semantic()
+            self.memory.get_all_profile()
+
+        )
+
+        semantic = (
+
+            self.memory.get_all_semantic()
+
+        )
 
         lines = [
 
@@ -221,19 +277,23 @@ class PersonalAssistant:
         ]
 
         # -----------------------------------------------------
-        # PROFILE MEMORY
+        # PROFILE
         # -----------------------------------------------------
 
         if profile:
 
             lines.append(
+
                 "\nProfile:"
+
             )
 
             for key, value in profile.items():
 
                 lines.append(
+
                     f"- {key}: {value}"
+
                 )
 
         # -----------------------------------------------------
@@ -243,78 +303,221 @@ class PersonalAssistant:
         if semantic:
 
             lines.append(
+
                 "\nSemantic:"
+
             )
 
             for category, items in semantic.items():
 
-                if not items:
-                    continue
-
                 values = ", ".join(
-                    str(item)
-                    for item in items
+
+                    [
+
+                        str(item)
+
+                        for item in items
+
+                    ]
+
                 )
 
-                lines.append(
-                    f"- {category}: {values}"
-                )
+                if values:
 
-        return "\n".join(lines)
+                    lines.append(
+
+                        f"- {category}: {values}"
+
+                    )
+
+        return "\n".join(
+
+            lines
+
+        )
 
     # =========================================================
     # AUTOMATIC MEMORY CAPTURE
     # =========================================================
 
     def _auto_memory_capture(
+
         self,
+
         text: str
+
     ):
 
         if not text:
+
             return
 
-        # Use the MemoryManager's automatic learning system.
+        t = text.lower()
 
-        try:
+        # -----------------------------------------------------
+        # NAME
+        # -----------------------------------------------------
 
-            self.memory.auto_learn(
-                text
+        if "my name is" in t:
+
+            name = (
+
+                text.split(
+
+                    "my name is",
+
+                    1
+
+                )[1].strip()
+
             )
 
-        except Exception as e:
+            if name:
 
-            self.logger.warning(
-                f"Automatic memory capture failed: {e}"
+                self.memory.set_profile(
+
+                    "name",
+
+                    name
+
+                )
+
+        # -----------------------------------------------------
+        # LIKES
+        # -----------------------------------------------------
+
+        if "i like" in t:
+
+            like = (
+
+                text.split(
+
+                    "i like",
+
+                    1
+
+                )[1].strip()
+
             )
+
+            if like:
+
+                self.memory.add_semantic_memory(
+
+                    "likes",
+
+                    like
+
+                )
+
+        # -----------------------------------------------------
+        # DISLIKES
+        # -----------------------------------------------------
+
+        if "i hate" in t:
+
+            dislike = (
+
+                text.split(
+
+                    "i hate",
+
+                    1
+
+                )[1].strip()
+
+            )
+
+            if dislike:
+
+                self.memory.add_semantic_memory(
+
+                    "dislikes",
+
+                    dislike
+
+                )
+
+        # -----------------------------------------------------
+        # INTERESTS
+        # -----------------------------------------------------
+
+        for word in [
+
+            "ai",
+
+            "coding",
+
+            "anime",
+
+            "music",
+
+            "python",
+
+            "robot",
+
+            "robotics"
+
+        ]:
+
+            if word in t:
+
+                self.memory.add_semantic_memory(
+
+                    "interests",
+
+                    word
+
+                )
 
     # =========================================================
     # DIRECT TOOL EXECUTION
     # =========================================================
 
     def _run_tools(
+
         self,
+
         user_input: str
+
     ):
 
         try:
 
-            tool_result = self.tool_manager.execute(
-                user_input
+            tool_result = (
+
+                self.tool_manager.execute(
+
+                    user_input
+
+                )
+
             )
 
             if not tool_result:
+
                 return None
 
-            if not tool_result.get("handled"):
+            if not tool_result.get(
+
+                "handled"
+
+            ):
+
                 return None
 
-            return tool_result.get("result")
+            return tool_result.get(
+
+                "result"
+
+            )
 
         except Exception as e:
 
             self.logger.error(
+
                 f"Tool execution error: {e}"
+
             )
 
             return None
@@ -324,84 +527,77 @@ class PersonalAssistant:
     # =========================================================
 
     def _run_agent_loop(
+
         self,
+
         user_input: str
+
     ):
 
         try:
 
             if not self.agent_loop:
+
                 return None
 
             return self.agent_loop.run(
+
                 user_input
+
             )
 
         except Exception as e:
 
             self.logger.error(
+
                 f"Agent loop error: {e}"
+
             )
 
             return None
-
-    # =========================================================
-    # SAVE TOOL CONVERSATION
-    # =========================================================
-
-    def _save_tool_exchange(
-        self,
-        user_input: str,
-        result: str
-    ):
-
-        if not result:
-            return
-
-        try:
-
-            self.conversation.add_exchange(
-                user_input,
-                result
-            )
-
-        except Exception as e:
-
-            self.logger.warning(
-                f"Could not save tool exchange: {e}"
-            )
 
     # =========================================================
     # MAIN PROCESSING PIPELINE
     # =========================================================
 
     def process_input(
+
         self,
+
         user_input: str
+
     ) -> str:
 
         try:
 
             # =================================================
-            # VALIDATE INPUT
+            # VALIDATE
             # =================================================
 
             if not user_input:
 
                 return (
+
                     "Please enter something."
+
                 )
 
-            user_input = user_input.strip()
+            user_input = (
+
+                user_input.strip()
+
+            )
 
             if not user_input:
 
                 return (
+
                     "Please enter something."
+
                 )
 
             # =================================================
-            # SET PROCESSING STATUS
+            # PROCESSING
             # =================================================
 
             self.status = "PROCESSING"
@@ -411,36 +607,37 @@ class PersonalAssistant:
             # =================================================
 
             self._auto_memory_capture(
+
                 user_input
+
             )
 
             # =================================================
-            # 2. TOOL EXECUTION
-            #
-            # Tools are executed only once.
-            #
-            # The previous version ran:
-            #
-            # ToolManager
-            #       ↓
-            # AgentLoop
-            #
-            # This could cause the same command to run twice.
+            # 2. DIRECT TOOL EXECUTION
             # =================================================
 
             tool_result = self._run_tools(
+
                 user_input
+
             )
 
             if tool_result:
 
                 self.logger.info(
-                    "Request handled by tool."
+
+                    "Request handled by direct tool."
+
                 )
 
-                self._save_tool_exchange(
+                # SAVE TOOL CONVERSATION
+
+                self.conversation.add_exchange(
+
                     user_input,
-                    tool_result
+
+                    str(tool_result)
+
                 )
 
                 self.status = "READY"
@@ -448,7 +645,39 @@ class PersonalAssistant:
                 return tool_result
 
             # =================================================
-            # 3. EMAIL FALLBACK
+            # 3. AGENT LOOP
+            # =================================================
+
+            agent_result = self._run_agent_loop(
+
+                user_input
+
+            )
+
+            if agent_result:
+
+                self.logger.info(
+
+                    "Request handled by agent loop."
+
+                )
+
+                # SAVE AGENT CONVERSATION
+
+                self.conversation.add_exchange(
+
+                    user_input,
+
+                    str(agent_result)
+
+                )
+
+                self.status = "READY"
+
+                return agent_result
+
+            # =================================================
+            # 4. EMAIL FALLBACK
             # =================================================
 
             if (
@@ -456,18 +685,29 @@ class PersonalAssistant:
                 self.email
 
                 and self._is_email_query(
+
                     user_input
+
                 )
 
             ):
 
-                response = self._handle_email_query(
-                    user_input
+                response = (
+
+                    self._handle_email_query(
+
+                        user_input
+
+                    )
+
                 )
 
-                self._save_tool_exchange(
+                self.conversation.add_exchange(
+
                     user_input,
+
                     response
+
                 )
 
                 self.status = "READY"
@@ -475,13 +715,23 @@ class PersonalAssistant:
                 return response
 
             # =================================================
-            # 4. LLM FALLBACK
+            # 5. LLM FALLBACK
             # =================================================
 
-            context = self.conversation.get_context()
+            context = (
 
-            memory_context = self._get_memory_context(
-                user_input
+                self.conversation.get_context()
+
+            )
+
+            memory_context = (
+
+                self._get_memory_context(
+
+                    user_input
+
+                )
+
             )
 
             personality_context = f"""
@@ -490,45 +740,81 @@ USER PERSONALITY:
 
 - tone: {self.personality_cache['tone']}
 
-- style: {self.personality_cache['communication_style']}
+- style: {
+    self.personality_cache[
+        'communication_style'
+    ]
+}
 
 - interests: {
     ', '.join(
-        self.personality_cache['interests']
+
+        self.personality_cache[
+
+            'interests'
+
+        ]
+
     )
 }
 
 """.strip()
+
+            # -------------------------------------------------
+            # ADD MEMORY CONTEXT
+            # -------------------------------------------------
 
             context.insert(
 
                 0,
 
                 {
+
                     "role": "system",
+
                     "content": memory_context
+
                 }
 
             )
+
+            # -------------------------------------------------
+            # ADD PERSONALITY CONTEXT
+            # -------------------------------------------------
 
             context.insert(
 
                 1,
 
                 {
+
                     "role": "system",
+
                     "content": personality_context
+
                 }
 
             )
 
-            response = self.llm.generate_response(
+            # -------------------------------------------------
+            # GENERATE RESPONSE
+            # -------------------------------------------------
 
-                user_input,
+            response = (
 
-                context
+                self.llm.generate_response(
+
+                    user_input,
+
+                    context
+
+                )
 
             )
+
+            # -------------------------------------------------
+            # SAVE CONVERSATION
+            # -------------------------------------------------
 
             self.conversation.add_exchange(
 
@@ -559,12 +845,15 @@ USER PERSONALITY:
             )
 
     # =========================================================
-    # EMAIL QUERY DETECTION
+    # EMAIL DETECTION
     # =========================================================
 
     def _is_email_query(
+
         self,
+
         text: str
+
     ):
 
         if not text:
@@ -594,12 +883,15 @@ USER PERSONALITY:
         )
 
     # =========================================================
-    # EMAIL QUERY HANDLER
+    # EMAIL HANDLER
     # =========================================================
 
     def _handle_email_query(
+
         self,
+
         user_input: str
+
     ):
 
         if not self.email:
@@ -677,10 +969,15 @@ USER PERSONALITY:
     # =========================================================
 
     def send_email(
+
         self,
+
         to,
+
         subject,
+
         body
+
     ):
 
         if not self.email:
@@ -698,13 +995,17 @@ USER PERSONALITY:
         )
 
     # =========================================================
-    # MEMORY CONTROL
+    # REMEMBER
     # =========================================================
 
     def remember(
+
         self,
+
         key,
+
         value
+
     ):
 
         self.memory.set_profile(
@@ -716,12 +1017,15 @@ USER PERSONALITY:
         )
 
     # =========================================================
-    # RECALL MEMORY
+    # RECALL
     # =========================================================
 
     def recall(
+
         self,
+
         key
+
     ):
 
         return self.memory.get_profile(
@@ -753,54 +1057,83 @@ USER PERSONALITY:
         }
 
     # =========================================================
-    # DEBUG CONFIGURATION
+    # SHOW CONFIG
     # =========================================================
 
     def show_config(self):
 
         print(
+
             "\n⚙️ SYSTEM STATUS"
+
         )
 
         print(
+
             "=" * 30
+
         )
 
         print(
+
             "Status:",
+
             self.status
+
         )
 
         print(
+
             "Tools:",
+
             list(
+
                 self.tool_manager.tools.keys()
+
             )
+
         )
 
         print(
+
             "Email:",
+
             bool(
+
                 self.email
+
             )
+
         )
 
         print(
+
             "Ollama:",
+
             self.llm.get_status()
+
         )
 
         print(
+
             "Memory:",
+
             self.memory.get_all_profile()
+
         )
 
         print(
+
             "Semantic:",
+
             self.memory.get_all_semantic()
+
         )
 
         print(
+
             "Personality:",
+
             self.personality_cache
+
         )
