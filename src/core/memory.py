@@ -1,272 +1,999 @@
 """
-Memory Management - Memory 4.0 (FIXED + COMPLETE COMPATIBILITY)
+Memory Management - Memory 5.0
+Persistent Profile, Semantic, Event, and Conversation Memory
 """
 
 import sqlite3
 import json
+
 from datetime import datetime
+
 from pathlib import Path
+
 from typing import List, Dict, Optional
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from utils.logger import setup_logger
+from src.utils.logger import setup_logger
+
 
 logger = setup_logger(__name__)
 
 
 class MemoryManager:
-    """Advanced persistent memory system (Memory 4.0 FIXED)"""
 
-    def __init__(self, db_path: str = "data/history.db"):
+    """
+    Persistent memory system for the AI assistant.
+
+    Stores:
+
+    - User profile information
+    - Likes
+    - Dislikes
+    - Interests
+    - Important events
+    - Conversation history
+    """
+
+    def __init__(
+
+        self,
+
+        db_path: str = "data/history.db"
+
+    ):
+
         self.db_path = db_path
+
         self._ensure_db_exists()
 
-    # ---------------- INIT ----------------
+    # =========================================================
+    # DATABASE INITIALIZATION
+    # =========================================================
 
     def _ensure_db_exists(self):
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        with sqlite3.connect(self.db_path) as conn:
+        Path(
+            self.db_path
+        ).parent.mkdir(
+
+            parents=True,
+
+            exist_ok=True
+
+        )
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            # ---------------------------------------------
+            # CONVERSATIONS
+            # ---------------------------------------------
+
+            cursor.execute("""
+
+                CREATE TABLE IF NOT EXISTS conversations (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    timestamp TEXT,
+
+                    user_message TEXT,
+
+                    assistant_message TEXT,
+
+                    metadata TEXT
+
+                )
+
+            """)
+
+            # ---------------------------------------------
+            # USER PROFILE
+            # ---------------------------------------------
+
+            cursor.execute("""
+
+                CREATE TABLE IF NOT EXISTS user_profile (
+
+                    key TEXT PRIMARY KEY,
+
+                    value TEXT,
+
+                    updated_at TEXT
+
+                )
+
+            """)
+
+            # ---------------------------------------------
+            # SEMANTIC MEMORY
+            # ---------------------------------------------
+
+            cursor.execute("""
+
+                CREATE TABLE IF NOT EXISTS semantic_memory (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    category TEXT,
+
+                    value TEXT,
+
+                    weight INTEGER DEFAULT 1,
+
+                    last_used TEXT
+
+                )
+
+            """)
+
+            # ---------------------------------------------
+            # EVENTS
+            # ---------------------------------------------
+
+            cursor.execute("""
+
+                CREATE TABLE IF NOT EXISTS events (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    type TEXT,
+
+                    content TEXT,
+
+                    importance INTEGER DEFAULT 1,
+
+                    timestamp TEXT
+
+                )
+
+            """)
+
+            conn.commit()
+
+        logger.info(
+
+            "Memory system initialized successfully."
+
+        )
+
+    # =========================================================
+    # PROFILE MEMORY
+    # =========================================================
+
+    def set_profile(
+
+        self,
+
+        key: str,
+
+        value: str
+
+    ):
+
+        if not key or value is None:
+
+            return
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            conn.execute("""
+
+                INSERT INTO user_profile (
+
+                    key,
+
+                    value,
+
+                    updated_at
+
+                )
+
+                VALUES (?, ?, ?)
+
+                ON CONFLICT(key)
+
+                DO UPDATE SET
+
+                    value = excluded.value,
+
+                    updated_at = excluded.updated_at
+
+            """, (
+
+                key.strip().lower(),
+
+                str(value).strip(),
+
+                datetime.now().isoformat()
+
+            ))
+
+            conn.commit()
+
+        logger.info(
+
+            f"Profile memory updated: {key}"
+
+        )
+
+    def get_profile(
+
+        self,
+
+        key: str
+
+    ) -> Optional[str]:
+
+        if not key:
+
+            return None
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
             cursor = conn.cursor()
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT,
-                    user_message TEXT,
-                    assistant_message TEXT,
-                    metadata TEXT
-                )
-            """)
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS user_profile (
-                    key TEXT PRIMARY KEY,
-                    value TEXT,
-                    updated_at TEXT
-                )
-            """)
+                SELECT value
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS semantic_memory (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category TEXT,
-                    value TEXT,
-                    weight INTEGER DEFAULT 1,
-                    last_used TEXT
-                )
-            """)
+                FROM user_profile
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    type TEXT,
-                    content TEXT,
-                    importance INTEGER DEFAULT 1,
-                    timestamp TEXT
-                )
-            """)
+                WHERE key = ?
 
-            conn.commit()
-            logger.info("Memory 4.0 DB initialized (FIXED)")
+            """, (
 
-    # =========================================================
-    # 🧠 PROFILE MEMORY
-    # =========================================================
+                key.strip().lower(),
 
-    def set_profile(self, key: str, value: str):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                INSERT INTO user_profile (key, value, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(key) DO UPDATE SET
-                    value=excluded.value,
-                    updated_at=excluded.updated_at
-            """, (key, value, datetime.now().isoformat()))
-            conn.commit()
+            ))
 
-    def get_profile(self, key: str) -> Optional[str]:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT value FROM user_profile WHERE key=?", (key,))
-            row = cur.fetchone()
+            row = cursor.fetchone()
+
             return row[0] if row else None
 
-    def get_all_profile(self) -> Dict:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT key, value FROM user_profile")
-            return dict(cur.fetchall())
+    def get_all_profile(
+
+        self
+
+    ) -> Dict:
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT key, value
+
+                FROM user_profile
+
+                ORDER BY updated_at DESC
+
+            """)
+
+            return dict(
+
+                cursor.fetchall()
+
+            )
 
     # =========================================================
-    # 🔥 SEMANTIC MEMORY
+    # SEMANTIC MEMORY
     # =========================================================
 
-    def add_semantic_memory(self, category: str, value: str):
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
+    def add_semantic_memory(
 
-            cur.execute("""
-                SELECT weight FROM semantic_memory
-                WHERE category=? AND value=?
-            """, (category, value))
+        self,
 
-            row = cur.fetchone()
+        category: str,
+
+        value: str
+
+    ):
+
+        if not category or not value:
+
+            return
+
+        category = category.strip().lower()
+
+        value = value.strip()
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT id, weight
+
+                FROM semantic_memory
+
+                WHERE category = ?
+
+                AND LOWER(value) = LOWER(?)
+
+            """, (
+
+                category,
+
+                value
+
+            ))
+
+            row = cursor.fetchone()
 
             if row:
-                cur.execute("""
+
+                cursor.execute("""
+
                     UPDATE semantic_memory
+
                     SET weight = weight + 1,
+
                         last_used = ?
-                    WHERE category=? AND value=?
-                """, (datetime.now().isoformat(), category, value))
+
+                    WHERE id = ?
+
+                """, (
+
+                    datetime.now().isoformat(),
+
+                    row[0]
+
+                ))
+
             else:
-                cur.execute("""
-                    INSERT INTO semantic_memory
-                    (category, value, weight, last_used)
-                    VALUES (?, ?, 1, ?)
-                """, (category, value, datetime.now().isoformat()))
+
+                cursor.execute("""
+
+                    INSERT INTO semantic_memory (
+
+                        category,
+
+                        value,
+
+                        weight,
+
+                        last_used
+
+                    )
+
+                    VALUES (?, ?, ?, ?)
+
+                """, (
+
+                    category,
+
+                    value,
+
+                    1,
+
+                    datetime.now().isoformat()
+
+                ))
 
             conn.commit()
 
-    def get_semantic_memory(self, category: str) -> List[str]:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT value FROM semantic_memory
-                WHERE category=?
+        logger.info(
+
+            f"Semantic memory updated: "
+
+            f"{category} -> {value}"
+
+        )
+
+    def get_semantic_memory(
+
+        self,
+
+        category: str
+
+    ) -> List[str]:
+
+        if not category:
+
+            return []
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT value
+
+                FROM semantic_memory
+
+                WHERE category = ?
+
+                ORDER BY weight DESC, last_used DESC
+
+            """, (
+
+                category.strip().lower(),
+
+            ))
+
+            return [
+
+                row[0]
+
+                for row in cursor.fetchall()
+
+            ]
+
+    def get_all_semantic(
+
+        self
+
+    ) -> Dict:
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT category, value
+
+                FROM semantic_memory
+
                 ORDER BY weight DESC
-            """, (category,))
-            return [r[0] for r in cur.fetchall()]
 
-    # =========================================================
-    # 🆕 COMPATIBILITY LAYER (IMPORTANT FIX)
-    # =========================================================
+            """)
 
-    def get_all_semantic(self) -> Dict:
-        """
-        FIX: used by Assistant + Planner + AgentLoop
-        """
-        return {
-            "likes": self.get_semantic_memory("likes"),
-            "dislikes": self.get_semantic_memory("dislikes"),
-            "interests": self.get_semantic_memory("interests"),
-        }
+            rows = cursor.fetchall()
 
-    def get_all_semantic_flat(self) -> Dict:
-        """
-        Alternative flat structure (future planning use)
-        """
+        result = {}
+
+        for category, value in rows:
+
+            if category not in result:
+
+                result[category] = []
+
+            result[category].append(value)
+
+        return result
+
+    def get_all_semantic_flat(
+
+        self
+
+    ) -> Dict:
+
         return self.get_all_semantic()
 
     # =========================================================
-    # 🆕 EVENT SYSTEM
+    # EVENT MEMORY
     # =========================================================
 
-    def add_event(self, type: str, content: str, importance: int = 1):
-        with sqlite3.connect(self.db_path) as conn:
+    def add_event(
+
+        self,
+
+        type: str,
+
+        content: str,
+
+        importance: int = 1
+
+    ):
+
+        if not type or not content:
+
+            return
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
             conn.execute("""
-                INSERT INTO events (type, content, importance, timestamp)
+
+                INSERT INTO events (
+
+                    type,
+
+                    content,
+
+                    importance,
+
+                    timestamp
+
+                )
+
                 VALUES (?, ?, ?, ?)
-            """, (type, content, importance, datetime.now().isoformat()))
+
+            """, (
+
+                type,
+
+                content,
+
+                importance,
+
+                datetime.now().isoformat()
+
+            ))
+
             conn.commit()
 
-    def get_events(self, limit: int = 10) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT type, content, importance, timestamp
+    def get_events(
+
+        self,
+
+        limit: int = 10
+
+    ) -> List[Dict]:
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT type,
+
+                       content,
+
+                       importance,
+
+                       timestamp
+
                 FROM events
+
                 ORDER BY importance DESC, id DESC
+
                 LIMIT ?
-            """, (limit,))
 
-            return [
-                {
-                    "type": r[0],
-                    "content": r[1],
-                    "importance": r[2],
-                    "timestamp": r[3]
-                }
-                for r in cur.fetchall()
-            ]
+            """, (
+
+                limit,
+
+            ))
+
+            rows = cursor.fetchall()
+
+        return [
+
+            {
+
+                "type": row[0],
+
+                "content": row[1],
+
+                "importance": row[2],
+
+                "timestamp": row[3]
+
+            }
+
+            for row in rows
+
+        ]
 
     # =========================================================
-    # 🧠 SMART MEMORY RETRIEVAL
+    # RELEVANT MEMORY
     # =========================================================
 
-    def retrieve_relevant_memory(self, text: str) -> Dict:
+    def retrieve_relevant_memory(
+
+        self,
+
+        text: str
+
+    ) -> Dict:
+
         return {
+
             "profile": self.get_all_profile(),
+
+            "semantic": self.get_all_semantic(),
+
             "events": self.get_events(),
-            "likes": self.get_semantic_memory("likes"),
-            "dislikes": self.get_semantic_memory("dislikes"),
-            "interests": self.get_semantic_memory("interests"),
+
         }
 
     # =========================================================
-    # 🧠 AUTO LEARN
+    # AUTO LEARNING
     # =========================================================
 
-    def auto_learn(self, text: str):
-        t = text.lower()
+    def auto_learn(
 
-        if "my name is" in t:
-            self.set_profile("name", text.split("my name is")[-1].strip())
+        self,
 
-        if "i like" in t:
-            self.add_semantic_memory("likes", text.split("i like")[-1].strip())
+        text: str
 
-        if "i hate" in t:
-            self.add_semantic_memory("dislikes", text.split("i hate")[-1].strip())
+    ):
 
-        for w in ["ai", "coding", "anime", "music", "games", "python"]:
-            if w in t:
-                self.add_semantic_memory("interests", w)
+        if not text:
+
+            return
+
+        original = text.strip()
+
+        lowered = original.lower()
+
+        # ---------------------------------------------
+        # NAME
+        # ---------------------------------------------
+
+        if "my name is" in lowered:
+
+            value = original[
+
+                lowered.index("my name is")
+
+                + len("my name is"):
+
+            ].strip()
+
+            if value:
+
+                self.set_profile(
+
+                    "name",
+
+                    value
+
+                )
+
+        # ---------------------------------------------
+        # PREFERRED NAME
+        # ---------------------------------------------
+
+        if "call me" in lowered:
+
+            value = original[
+
+                lowered.index("call me")
+
+                + len("call me"):
+
+            ].strip()
+
+            if value:
+
+                self.set_profile(
+
+                    "name",
+
+                    value
+
+                )
+
+        # ---------------------------------------------
+        # LIKES
+        # ---------------------------------------------
+
+        like_phrases = [
+
+            "i like",
+
+            "i love",
+
+            "i enjoy",
+
+            "i am interested in",
+
+            "i'm interested in"
+
+        ]
+
+        for phrase in like_phrases:
+
+            if phrase in lowered:
+
+                start = (
+
+                    lowered.index(phrase)
+
+                    + len(phrase)
+
+                )
+
+                value = original[start:].strip()
+
+                if value:
+
+                    self.add_semantic_memory(
+
+                        "likes",
+
+                        value
+
+                    )
+
+                break
+
+        # ---------------------------------------------
+        # DISLIKES
+        # ---------------------------------------------
+
+        dislike_phrases = [
+
+            "i hate",
+
+            "i dislike",
+
+            "i don't like",
+
+            "i do not like"
+
+        ]
+
+        for phrase in dislike_phrases:
+
+            if phrase in lowered:
+
+                start = (
+
+                    lowered.index(phrase)
+
+                    + len(phrase)
+
+                )
+
+                value = original[start:].strip()
+
+                if value:
+
+                    self.add_semantic_memory(
+
+                        "dislikes",
+
+                        value
+
+                    )
+
+                break
+
+        # ---------------------------------------------
+        # INTERESTS
+        # ---------------------------------------------
+
+        known_interests = [
+
+            "ai",
+
+            "artificial intelligence",
+
+            "coding",
+
+            "programming",
+
+            "anime",
+
+            "music",
+
+            "games",
+
+            "gaming",
+
+            "python",
+
+            "robot",
+
+            "robotics",
+
+            "technology",
+
+            "technology"
+
+        ]
+
+        for interest in known_interests:
+
+            if interest in lowered:
+
+                self.add_semantic_memory(
+
+                    "interests",
+
+                    interest
+
+                )
 
     # =========================================================
-    # 🧾 HISTORY
+    # CONVERSATION HISTORY
     # =========================================================
 
-    def save_exchange(self, exchange: Dict):
-        with sqlite3.connect(self.db_path) as conn:
+    def save_exchange(
+
+        self,
+
+        exchange: Dict
+
+    ):
+
+        if not exchange:
+
+            return
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
             conn.execute("""
-                INSERT INTO conversations
-                (timestamp, user_message, assistant_message, metadata)
+
+                INSERT INTO conversations (
+
+                    timestamp,
+
+                    user_message,
+
+                    assistant_message,
+
+                    metadata
+
+                )
+
                 VALUES (?, ?, ?, ?)
+
             """, (
-                exchange.get("timestamp"),
-                exchange.get("user"),
-                exchange.get("assistant"),
-                json.dumps(exchange.get("metadata", {}))
+
+                exchange.get(
+
+                    "timestamp",
+
+                    datetime.now().isoformat()
+
+                ),
+
+                exchange.get(
+
+                    "user",
+
+                    ""
+
+                ),
+
+                exchange.get(
+
+                    "assistant",
+
+                    ""
+
+                ),
+
+                json.dumps(
+
+                    exchange.get(
+
+                        "metadata",
+
+                        {}
+
+                    )
+
+                )
+
             ))
+
             conn.commit()
 
-    def get_history(self, limit: int = 10):
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT timestamp, user_message, assistant_message
+    def get_history(
+
+        self,
+
+        limit: int = 10
+
+    ):
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                SELECT timestamp,
+
+                       user_message,
+
+                       assistant_message
+
                 FROM conversations
+
                 ORDER BY id DESC
+
                 LIMIT ?
-            """, (limit,))
 
-            rows = cur.fetchall()
+            """, (
 
-            return list(reversed([
-                {
-                    "timestamp": r[0],
-                    "user": r[1],
-                    "assistant": r[2]
-                }
-                for r in rows
-            ]))
+                limit,
 
-    def clear_history(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM conversations")
+            ))
+
+            rows = cursor.fetchall()
+
+        return list(
+
+            reversed(
+
+                [
+
+                    {
+
+                        "timestamp": row[0],
+
+                        "user": row[1],
+
+                        "assistant": row[2]
+
+                    }
+
+                    for row in rows
+
+                ]
+
+            )
+
+        )
+
+    def clear_history(
+
+        self
+
+    ):
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            conn.execute(
+
+                "DELETE FROM conversations"
+
+            )
+
             conn.commit()
+
+        logger.info(
+
+            "Conversation history cleared."
+
+        )
