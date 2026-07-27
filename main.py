@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Personal AI Assistant - Main Entry Point
-NEXUS Neural Pulse Loading Animation
+NEXUS Interface
 """
 
 import sys
@@ -11,295 +11,277 @@ import time
 from dotenv import load_dotenv
 import typer
 
-
 load_dotenv()
-
-
-# =========================================================
-# IMPORTS
-# =========================================================
 
 from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
 
-
-logger = setup_logger(__name__)
-
+logger = setup_logger(**name**)
 
 app = typer.Typer()
 
-
 assistant = None
 
-
-# =========================================================
-# NEXUS LOADING ANIMATION
 # =========================================================
 
-class NexusLoadingAnimation:
+# INITIALIZE ASSISTANT
 
-    """
-    Neural Pulse animation for NEXUS.
-
-    Animation:
-
-        NEXUS  ◉──○──○
-        NEXUS  ○──◉──○
-        NEXUS  ○──○──◉
-        NEXUS  ○──◉──○
-    """
-
-    def __init__(self):
-
-        self.running = False
-
-        self.thread = None
-
-        self.frames = [
-
-            "◉──○──○",
-
-            "○──◉──○",
-
-            "○──○──◉",
-
-            "○──◉──○"
-
-        ]
-
-        self.frame_index = 0
-
-    def _animate(self):
-
-        while self.running:
-
-            frame = (
-
-                self.frames[
-
-                    self.frame_index
-
-                    % len(self.frames)
-
-                ]
-
-            )
-
-            # \r returns to the beginning
-            # of the current terminal line.
-
-            print(
-
-                f"\rNEXUS  {frame}  Processing...",
-
-                end="",
-
-                flush=True
-
-            )
-
-            self.frame_index += 1
-
-            time.sleep(0.18)
-
-    def start(self):
-
-        if self.running:
-
-            return
-
-        self.running = True
-
-        self.frame_index = 0
-
-        self.thread = threading.Thread(
-
-            target=self._animate,
-
-            daemon=True
-
-        )
-
-        self.thread.start()
-
-    def stop(self):
-
-        if not self.running:
-
-            return
-
-        self.running = False
-
-        if self.thread:
-
-            self.thread.join(
-
-                timeout=1
-
-            )
-
-        # Clear the animation line.
-
-        print(
-
-            "\r" + (" " * 60) + "\r",
-
-            end="",
-
-            flush=True
-
-        )
-
-
-# =========================================================
-# ASSISTANT INITIALIZATION
 # =========================================================
 
 def init_assistant():
 
-    """Initialize assistant once."""
+```
+global assistant
 
-    global assistant
-
-    if assistant is None:
-
-        try:
-
-            logger.info(
-
-                "Initializing Personal AI Assistant..."
-
-            )
-
-            assistant = PersonalAssistant()
-
-        except Exception as e:
-
-            logger.error(
-
-                f"Failed to initialize assistant: {e}"
-
-            )
-
-            print(
-
-                f"❌ Initialization error: {e}"
-
-            )
-
-            sys.exit(1)
-
-    return assistant
-
-
-# =========================================================
-# PROCESS WITH NEXUS ANIMATION
-# =========================================================
-
-def process_with_animation(
-
-    bot,
-
-    user_input
-
-):
-
-    """
-
-    Runs the assistant while the NEXUS
-    neural pulse animation is active.
-    """
-
-    loading = NexusLoadingAnimation()
-
-    loading.start()
+if assistant is None:
 
     try:
 
-        response = bot.process_input(
-
-            user_input
-
+        logger.info(
+            "Initializing Personal AI Assistant..."
         )
 
-        return response
+        assistant = PersonalAssistant()
 
-    finally:
+    except Exception as e:
 
-        loading.stop()
+        logger.error(
+            f"Failed to initialize assistant: {e}"
+        )
 
+        print(
+            f"❌ Initialization error: {e}"
+        )
+
+        sys.exit(1)
+
+return assistant
+```
 
 # =========================================================
-# CHAT MODE
+
+# NEXUS PROCESSING ANIMATION
+
 # =========================================================
 
-@app.command()
+def nexus_animation(
+stop_event
+):
 
-def chat():
+```
+frames = [
 
-    """Interactive chat mode."""
+    "○──○──◉",
 
-    bot = init_assistant()
+    "○──◉──○",
+
+    "◉──○──○",
+
+    "○──◉──○"
+
+]
+
+index = 0
+
+while not stop_event.is_set():
+
+    frame = frames[index]
 
     print(
 
-        "\n🤖 NEXUS AI Assistant Ready "
+        f"\r[NEXUS]  {frame}  Processing...",
 
-        "(type 'help' for commands)\n"
+        end="",
+
+        flush=True
 
     )
 
-    while True:
+    index = (
 
-        try:
+        index + 1
 
-            user_input = input(
+    ) % len(frames)
 
-                "You: "
+    time.sleep(
+        0.25
+    )
 
-            ).strip()
+# -----------------------------------------------------
+# CLEAR THE ANIMATION LINE COMPLETELY
+# -----------------------------------------------------
 
-            if not user_input:
+print(
 
-                continue
+    "\r" + " " * 45 + "\r",
 
-            cmd = user_input.lower()
+    end="",
 
-            # -------------------------------------------------
-            # EXIT
-            # -------------------------------------------------
+    flush=True
 
-            if cmd in [
+)
+```
 
-                "quit",
+# =========================================================
 
-                "exit"
+# PROCESS USER REQUEST WITH ANIMATION
 
-            ]:
+# =========================================================
 
-                print(
+def process_with_animation(
+bot,
+user_input
+):
 
-                    "Bye 👋"
+```
+result = {
 
-                )
+    "response": None,
 
-                break
+    "error": None
 
-            # -------------------------------------------------
-            # HELP
-            # -------------------------------------------------
+}
 
-            if cmd == "help":
+stop_event = threading.Event()
 
-                print_help()
+# -----------------------------------------------------
+# RUN ASSISTANT IN BACKGROUND
+# -----------------------------------------------------
 
-                continue
+def run_assistant():
 
-            # -------------------------------------------------
-            # PROCESS REQUEST
-            # -------------------------------------------------
+    try:
 
-            response = process_with_animation(
+        result["response"] = (
+
+            bot.process_input(
+
+                user_input
+
+            )
+
+        )
+
+    except Exception as e:
+
+        result["error"] = e
+
+    finally:
+
+        stop_event.set()
+
+# -----------------------------------------------------
+# START ASSISTANT PROCESSING
+# -----------------------------------------------------
+
+worker = threading.Thread(
+
+    target=run_assistant,
+
+    daemon=True
+
+)
+
+worker.start()
+
+# -----------------------------------------------------
+# START NEXUS ANIMATION
+# -----------------------------------------------------
+
+nexus_animation(
+
+    stop_event
+
+)
+
+worker.join()
+
+# -----------------------------------------------------
+# HANDLE ERRORS
+# -----------------------------------------------------
+
+if result["error"]:
+
+    raise result["error"]
+
+return result["response"]
+```
+
+# =========================================================
+
+# CHAT MODE
+
+# =========================================================
+
+@app.command()
+def chat():
+
+```
+bot = init_assistant()
+
+print(
+
+    "\n🤖 NEXUS AI Assistant Ready "
+
+    "(type 'help' for commands)\n"
+
+)
+
+while True:
+
+    try:
+
+        user_input = input(
+
+            "You: "
+
+        ).strip()
+
+        if not user_input:
+
+            continue
+
+        cmd = user_input.lower()
+
+        # -------------------------------------------------
+        # EXIT
+        # -------------------------------------------------
+
+        if cmd in [
+
+            "quit",
+
+            "exit"
+
+        ]:
+
+            print(
+
+                "Bye 👋"
+
+            )
+
+            break
+
+        # -------------------------------------------------
+        # HELP
+        # -------------------------------------------------
+
+        if cmd == "help":
+
+            print_help()
+
+            continue
+
+        # -------------------------------------------------
+        # PROCESS REQUEST
+        # -------------------------------------------------
+
+        print()
+
+        response = (
+
+            process_with_animation(
 
                 bot,
 
@@ -307,74 +289,29 @@ def chat():
 
             )
 
-            print(
-
-                f"\nAssistant: {response}\n"
-
-            )
-
-        except KeyboardInterrupt:
-
-            print(
-
-                "\nBye 👋"
-
-            )
-
-            break
-
-        except Exception as e:
-
-            logger.error(
-
-                f"Chat error: {e}"
-
-            )
-
-            print(
-
-                f"❌ Error: {e}"
-
-            )
-
-
-# =========================================================
-# ASK MODE
-# =========================================================
-
-@app.command()
-
-def ask(
-
-    question: str
-
-):
-
-    """Single question mode."""
-
-    bot = init_assistant()
-
-    try:
-
-        response = process_with_animation(
-
-            bot,
-
-            question
-
         )
 
         print(
 
-            response
+            f"\nAssistant: {response}\n"
 
         )
+
+    except KeyboardInterrupt:
+
+        print(
+
+            "\nBye 👋"
+
+        )
+
+        break
 
     except Exception as e:
 
         logger.error(
 
-            f"Ask error: {e}"
+            f"Chat error: {e}"
 
         )
 
@@ -383,59 +320,119 @@ def ask(
             f"❌ Error: {e}"
 
         )
-
+```
 
 # =========================================================
-# VERSION
+
+# ASK MODE
+
 # =========================================================
 
 @app.command()
+def ask(
+question: str
+):
 
-def version():
+```
+bot = init_assistant()
 
-    print(
+try:
 
-        "NEXUS AI Assistant v1.0.0 "
+    response = (
 
-        "(Ollama Ready)"
+        process_with_animation(
+
+            bot,
+
+            question
+
+        )
 
     )
 
+    print(
+
+        response
+
+    )
+
+except Exception as e:
+
+    logger.error(
+
+        f"Ask error: {e}"
+
+    )
+
+    print(
+
+        f"❌ Error: {e}"
+
+    )
+```
 
 # =========================================================
+
+# VERSION
+
+# =========================================================
+
+@app.command()
+def version():
+
+```
+print(
+
+    "NEXUS AI Assistant v1.0.0 "
+
+    "(Ollama Ready)"
+
+)
+```
+
+# =========================================================
+
 # HELP
+
 # =========================================================
 
 def print_help():
 
-    print(
+```
+print(
 
-        """
+    """
+```
 
 📌 Commands:
 
-- chat        → interactive mode
-- ask "text"  → single question
-- version     → show version
-- exit        → quit chat
+* chat        → interactive mode
+* ask "text"  → single question
+* version     → show version
+* exit        → quit chat
 
 """
 
-    )
-
+```
+)
+```
 
 # =========================================================
+
 # ENTRY POINT
+
 # =========================================================
 
-if __name__ == "__main__":
+if **name** == "**main**":
 
-    if len(sys.argv) == 1:
+```
+if len(sys.argv) == 1:
 
-        init_assistant()
+    init_assistant()
 
-        chat()
+    chat()
 
-    else:
+else:
 
-        app()
+    app()
+```
