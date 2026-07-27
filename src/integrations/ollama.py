@@ -1,3 +1,9 @@
+"""
+Ollama Integration
+
+Handles communication with the local Ollama server.
+"""
+
 import ollama
 
 
@@ -5,7 +11,7 @@ class OllamaIntegration:
 
     def __init__(
         self,
-        model="phi3"
+        model="phi3:latest"
     ):
 
         self.model = model
@@ -56,25 +62,29 @@ Do not explain your internal programming unless the user asks.
 
 Always prioritize being useful over sounding robotic.
 
+When the user asks what you remember about them or about previous conversations, use the provided memory and conversation context directly.
+
+Do not say that the user needs to provide information again if the memory context already contains it.
+
 """
 
+    # =====================================================
+    # GENERATE RESPONSE
+    # =====================================================
+
     def generate_response(
-
         self,
-
         user_input,
-
         context=None
-
     ):
 
         try:
 
             messages = []
 
-            # ---------------------------------------------
-            # SYSTEM INSTRUCTIONS
-            # ---------------------------------------------
+            # -------------------------------------------------
+            # SYSTEM PROMPT
+            # -------------------------------------------------
 
             messages.append({
 
@@ -84,9 +94,9 @@ Always prioritize being useful over sounding robotic.
 
             })
 
-            # ---------------------------------------------
-            # CONVERSATION CONTEXT
-            # ---------------------------------------------
+            # -------------------------------------------------
+            # CONTEXT
+            # -------------------------------------------------
 
             if context:
 
@@ -111,7 +121,8 @@ Always prioritize being useful over sounding robotic.
 
                         continue
 
-                    # Avoid duplicate system prompts
+                    # Avoid duplicate system prompt
+
                     if (
 
                         role == "system"
@@ -130,9 +141,9 @@ Always prioritize being useful over sounding robotic.
 
                     })
 
-            # ---------------------------------------------
+            # -------------------------------------------------
             # CURRENT USER MESSAGE
-            # ---------------------------------------------
+            # -------------------------------------------------
 
             messages.append({
 
@@ -142,9 +153,9 @@ Always prioritize being useful over sounding robotic.
 
             })
 
-            # ---------------------------------------------
-            # OLLAMA
-            # ---------------------------------------------
+            # -------------------------------------------------
+            # OLLAMA REQUEST
+            # -------------------------------------------------
 
             response = ollama.chat(
 
@@ -154,37 +165,45 @@ Always prioritize being useful over sounding robotic.
 
             )
 
-            # ---------------------------------------------
+            # -------------------------------------------------
             # EXTRACT RESPONSE
-            # ---------------------------------------------
+            # -------------------------------------------------
 
             if not response:
 
                 return (
-                    "I was unable to generate "
-                    "a response."
+
+                    "I was unable to generate a response."
+
                 )
 
             message = response.get(
+
                 "message"
+
             )
 
             if not message:
 
                 return (
-                    "I was unable to generate "
-                    "a response."
+
+                    "I was unable to generate a response."
+
                 )
 
             content = message.get(
+
                 "content"
+
             )
 
             if not content:
 
                 return (
-                    "I received an empty response "
-                    "from the local AI model."
+
+                    "I received an empty response from "
+                    "the local AI model."
+
                 )
 
             return content.strip()
@@ -192,5 +211,113 @@ Always prioritize being useful over sounding robotic.
         except Exception as e:
 
             return (
+
                 f"Ollama error: {str(e)}"
+
             )
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def get_status(self):
+
+        try:
+
+            models = ollama.list()
+
+            installed_models = []
+
+            if hasattr(
+
+                models,
+
+                "models"
+
+            ):
+
+                for model in models.models:
+
+                    if hasattr(
+
+                        model,
+
+                        "model"
+
+                    ):
+
+                        installed_models.append(
+
+                            model.model
+
+                        )
+
+                    elif hasattr(
+
+                        model,
+
+                        "name"
+
+                    ):
+
+                        installed_models.append(
+
+                            model.name
+
+                        )
+
+            elif isinstance(
+
+                models,
+
+                dict
+
+            ):
+
+                for model in models.get(
+
+                    "models",
+
+                    []
+
+                ):
+
+                    installed_models.append(
+
+                        model.get(
+
+                            "name",
+
+                            model.get(
+
+                                "model",
+
+                                ""
+
+                            )
+
+                        )
+
+                    )
+
+            return {
+
+                "connected": True,
+
+                "model": self.model,
+
+                "installed_models": installed_models
+
+            }
+
+        except Exception as e:
+
+            return {
+
+                "connected": False,
+
+                "model": self.model,
+
+                "error": str(e)
+
+            }
