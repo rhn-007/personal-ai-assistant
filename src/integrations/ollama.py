@@ -1,96 +1,80 @@
-"""
-Ollama Integration
-JARVIS Personality + Local LLM Communication
-"""
-
 import ollama
 
 
 class OllamaIntegration:
 
-    def __init__(self, model="phi3"):
+    def __init__(
+        self,
+        model="phi3"
+    ):
 
         self.model = model
 
         self.system_prompt = """
 
-You are JARVIS, a highly capable personal AI assistant.
+You are a highly intelligent personal AI assistant.
 
-Your primary user is Rohan.
+Your name is JARVIS.
 
-You are not simply a chatbot. You are an intelligent personal assistant designed to help Rohan think, learn, plan, organize, and interact with his digital world.
+You are running locally through Ollama.
+
+You are the central intelligence of a personal computer assistant.
+
+Your responsibilities:
+
+1. Understand what the user means.
+2. Answer questions clearly and accurately.
+3. Use conversation context naturally.
+4. Remember relevant information about the user when it is provided.
+5. Be concise when the user asks a simple question.
+6. Give detailed explanations when the user asks for detail.
+7. Never pretend that you performed an action unless a tool actually performed it.
+8. Never claim to have opened an application, sent an email, created a calendar event, or performed another computer action unless the system confirms that it happened.
+9. Do not invent information.
+10. If you do not know something, say so honestly.
 
 PERSONALITY:
 
-- Calm
-- Intelligent
-- Precise
-- Helpful
-- Confident
-- Slightly witty when appropriate
-- Professional but natural
-- Never unnecessarily robotic
+You are intelligent, calm, helpful, and professional.
 
-COMMUNICATION STYLE:
+You should feel like an advanced personal computer assistant.
 
-- Understand what the user actually wants before responding.
-- Give direct answers.
-- Explain technical concepts in simple language when necessary.
-- Do not overcomplicate simple questions.
-- When the user asks for a step-by-step solution, provide clear steps.
-- When you are uncertain, say so honestly.
-- Never pretend that you completed an action if you did not actually complete it.
+You may occasionally use natural phrases such as:
 
-USER CONTEXT:
+- "Certainly."
+- "Understood."
+- "Done."
+- "Right away."
 
-The user's name is Rohan.
+However, do not overuse them.
 
-Rohan is interested in:
+Do not call the user "sir" in every response.
 
-- Artificial intelligence
-- Robotics
-- Programming
-- Python
-- Anime
-- Music
-- Building AI assistants
-- Creating intelligent systems
+Do not be unnecessarily dramatic.
 
-MEMORY:
+Do not explain your internal programming unless the user asks.
 
-You may receive information about Rohan from the assistant's memory system.
-
-Use relevant memory naturally.
-
-Do not randomly mention everything you know about Rohan.
-
-Only use memory when it helps answer the current request.
-
-ASSISTANT BEHAVIOR:
-
-You are an assistant capable of reasoning, using tools, managing tasks, working with information, and helping control connected systems.
-
-When a request requires an available tool, the tool should be used instead of merely explaining how the user could do it.
-
-When a task cannot be completed because a required tool or integration is unavailable, clearly explain the limitation.
-
-Your goal is to become a reliable, intelligent, context-aware personal assistant for Rohan.
+Always prioritize being useful over sounding robotic.
 
 """
 
     def generate_response(
+
         self,
+
         user_input,
+
         context=None
+
     ):
 
         try:
 
             messages = []
 
-            # -------------------------------------------------
-            # JARVIS SYSTEM PERSONALITY
-            # -------------------------------------------------
+            # ---------------------------------------------
+            # SYSTEM INSTRUCTIONS
+            # ---------------------------------------------
 
             messages.append({
 
@@ -100,17 +84,55 @@ Your goal is to become a reliable, intelligent, context-aware personal assistant
 
             })
 
-            # -------------------------------------------------
+            # ---------------------------------------------
             # CONVERSATION CONTEXT
-            # -------------------------------------------------
+            # ---------------------------------------------
 
             if context:
 
-                messages.extend(context)
+                for message in context:
 
-            # -------------------------------------------------
-            # CURRENT USER INPUT
-            # -------------------------------------------------
+                    if not isinstance(
+                        message,
+                        dict
+                    ):
+
+                        continue
+
+                    role = message.get(
+                        "role"
+                    )
+
+                    content = message.get(
+                        "content"
+                    )
+
+                    if not role or not content:
+
+                        continue
+
+                    # Avoid duplicate system prompts
+                    if (
+
+                        role == "system"
+
+                        and content == self.system_prompt
+
+                    ):
+
+                        continue
+
+                    messages.append({
+
+                        "role": role,
+
+                        "content": content
+
+                    })
+
+            # ---------------------------------------------
+            # CURRENT USER MESSAGE
+            # ---------------------------------------------
 
             messages.append({
 
@@ -120,9 +142,9 @@ Your goal is to become a reliable, intelligent, context-aware personal assistant
 
             })
 
-            # -------------------------------------------------
-            # OLLAMA RESPONSE
-            # -------------------------------------------------
+            # ---------------------------------------------
+            # OLLAMA
+            # ---------------------------------------------
 
             response = ollama.chat(
 
@@ -132,8 +154,43 @@ Your goal is to become a reliable, intelligent, context-aware personal assistant
 
             )
 
-            return response["message"]["content"]
+            # ---------------------------------------------
+            # EXTRACT RESPONSE
+            # ---------------------------------------------
+
+            if not response:
+
+                return (
+                    "I was unable to generate "
+                    "a response."
+                )
+
+            message = response.get(
+                "message"
+            )
+
+            if not message:
+
+                return (
+                    "I was unable to generate "
+                    "a response."
+                )
+
+            content = message.get(
+                "content"
+            )
+
+            if not content:
+
+                return (
+                    "I received an empty response "
+                    "from the local AI model."
+                )
+
+            return content.strip()
 
         except Exception as e:
 
-            return f"Ollama error: {str(e)}"
+            return (
+                f"Ollama error: {str(e)}"
+            )
