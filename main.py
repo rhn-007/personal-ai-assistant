@@ -34,10 +34,6 @@ assistant = None
 
 def init_assistant():
 
-    """
-    Initialize the assistant once.
-    """
-
     global assistant
 
     if assistant is None:
@@ -71,11 +67,6 @@ def init_assistant():
 
 def nexus_animation(stop_event):
 
-    """
-    Displays the NEXUS processing animation
-    while the assistant is working.
-    """
-
     frames = [
 
         "○──○──◉",
@@ -90,9 +81,11 @@ def nexus_animation(stop_event):
 
     index = 0
 
+
     while not stop_event.is_set():
 
         frame = frames[index]
+
 
         print(
 
@@ -104,14 +97,18 @@ def nexus_animation(stop_event):
 
         )
 
+
         index = (
 
             index + 1
 
         ) % len(frames)
 
+
         time.sleep(
+
             0.25
+
         )
 
 
@@ -142,11 +139,6 @@ def process_with_animation(
 
 ):
 
-    """
-    Runs the assistant in a background thread
-    while the NEXUS animation runs in the main thread.
-    """
-
     result = {
 
         "response": None,
@@ -160,7 +152,7 @@ def process_with_animation(
 
 
     # -----------------------------------------------------
-    # ASSISTANT WORKER
+    # RUN ASSISTANT IN BACKGROUND
     # -----------------------------------------------------
 
     def run_assistant():
@@ -186,10 +178,6 @@ def process_with_animation(
             stop_event.set()
 
 
-    # -----------------------------------------------------
-    # START ASSISTANT PROCESSING
-    # -----------------------------------------------------
-
     worker = threading.Thread(
 
         target=run_assistant,
@@ -198,11 +186,12 @@ def process_with_animation(
 
     )
 
+
     worker.start()
 
 
     # -----------------------------------------------------
-    # START NEXUS ANIMATION
+    # RUN ANIMATION
     # -----------------------------------------------------
 
     nexus_animation(
@@ -214,10 +203,6 @@ def process_with_animation(
 
     worker.join()
 
-
-    # -----------------------------------------------------
-    # RETURN ERROR IF ONE OCCURRED
-    # -----------------------------------------------------
 
     if result["error"]:
 
@@ -232,11 +217,8 @@ def process_with_animation(
 # =========================================================
 
 @app.command()
-def chat():
 
-    """
-    Interactive chat mode.
-    """
+def chat():
 
     bot = init_assistant()
 
@@ -306,11 +288,16 @@ def chat():
 
 
             # -------------------------------------------------
-            # PROCESS INPUT
+            # PROCESS REQUEST
+            #
+            # IMPORTANT:
+            #
+            # There is intentionally NO print()
+            # before process_with_animation().
+            #
+            # This ensures the animation appears
+            # immediately after the final log line.
             # -------------------------------------------------
-
-            print()
-
 
             response = (
 
@@ -365,15 +352,12 @@ def chat():
 # =========================================================
 
 @app.command()
+
 def ask(
 
     question: str
 
 ):
-
-    """
-    Ask NEXUS a single question.
-    """
 
     bot = init_assistant()
 
@@ -421,11 +405,8 @@ def ask(
 # =========================================================
 
 @app.command()
-def version():
 
-    """
-    Show assistant version.
-    """
+def version():
 
     print(
 
