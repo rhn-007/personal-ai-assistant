@@ -64,6 +64,12 @@ class PersonalAssistant:
     def __init__(self):
 
         # =====================================================
+        # ASSISTANT STATUS
+        # =====================================================
+
+        self.status = "INITIALIZING"
+
+        # =====================================================
         # LOGGER
         # =====================================================
 
@@ -147,9 +153,6 @@ class PersonalAssistant:
             SystemTool()
         )
 
-        # BrowserTool requires the LLM
-        # for webpage summarization.
-
         self.tool_manager.register(
 
             BrowserTool(
@@ -167,7 +170,7 @@ class PersonalAssistant:
         self.planner = Planner(
             self.tool_manager
         )
-        
+
         self.tool_manager.set_planner(
             self.planner
         )
@@ -188,11 +191,23 @@ class PersonalAssistant:
 
         )
 
+        # =====================================================
+        # ASSISTANT READY
+        # =====================================================
+
+        self.status = "READY"
+
         self.logger.info(
-
             "Assistant ready."
-
         )
+
+    # =========================================================
+    # STATUS
+    # =========================================================
+
+    def get_status(self):
+
+        return self.status
 
     # =========================================================
     # MEMORY CONTEXT
@@ -528,6 +543,12 @@ class PersonalAssistant:
                 )
 
             # =================================================
+            # SET PROCESSING STATUS
+            # =================================================
+
+            self.status = "PROCESSING"
+
+            # =================================================
             # 1. MEMORY CAPTURE
             # =================================================
 
@@ -539,22 +560,6 @@ class PersonalAssistant:
 
             # =================================================
             # 2. DIRECT TOOL EXECUTION
-            #
-            # IMPORTANT:
-            #
-            # Tools are checked BEFORE the Agent Loop.
-            #
-            # This allows:
-            #
-            # summarize https://example.com
-            #
-            # to immediately reach:
-            #
-            # BrowserTool
-            #
-            # instead of getting stuck inside:
-            #
-            # AgentLoop → Planner
             # =================================================
 
             tool_result = self._run_tools(
@@ -571,6 +576,8 @@ class PersonalAssistant:
 
                 )
 
+                self.status = "READY"
+
                 return tool_result
 
             # =================================================
@@ -584,6 +591,8 @@ class PersonalAssistant:
             )
 
             if agent_result:
+
+                self.status = "READY"
 
                 return agent_result
 
@@ -603,11 +612,15 @@ class PersonalAssistant:
 
             ):
 
-                return self._handle_email_query(
+                response = self._handle_email_query(
 
                     user_input
 
                 )
+
+                self.status = "READY"
+
+                return response
 
             # =================================================
             # 5. LLM FALLBACK
@@ -645,10 +658,6 @@ USER PERSONALITY:
 
 """.strip()
 
-            # -------------------------------------------------
-            # ADD MEMORY CONTEXT
-            # -------------------------------------------------
-
             context.insert(
 
                 0,
@@ -662,10 +671,6 @@ USER PERSONALITY:
                 }
 
             )
-
-            # -------------------------------------------------
-            # ADD PERSONALITY CONTEXT
-            # -------------------------------------------------
 
             context.insert(
 
@@ -681,10 +686,6 @@ USER PERSONALITY:
 
             )
 
-            # -------------------------------------------------
-            # GENERATE RESPONSE
-            # -------------------------------------------------
-
             response = (
 
                 self.llm.generate_response(
@@ -697,10 +698,6 @@ USER PERSONALITY:
 
             )
 
-            # -------------------------------------------------
-            # SAVE CONVERSATION
-            # -------------------------------------------------
-
             self.conversation.add_exchange(
 
                 user_input,
@@ -709,9 +706,13 @@ USER PERSONALITY:
 
             )
 
+            self.status = "READY"
+
             return response
 
         except Exception as e:
+
+            self.status = "ERROR"
 
             self.logger.error(
 
@@ -779,10 +780,6 @@ USER PERSONALITY:
 
         text = user_input.lower()
 
-        # -----------------------------------------------------
-        # SEARCH EMAILS FROM SENDER
-        # -----------------------------------------------------
-
         if "from:" in text:
 
             sender = (
@@ -836,10 +833,6 @@ USER PERSONALITY:
                 ]
 
             )
-
-        # -----------------------------------------------------
-        # DEFAULT EMAIL SUMMARY
-        # -----------------------------------------------------
 
         return (
 
@@ -947,6 +940,14 @@ USER PERSONALITY:
 
         print(
 
+            "Status:",
+
+            self.status
+
+        )
+
+        print(
+
             "Tools:",
 
             list(
@@ -966,6 +967,14 @@ USER PERSONALITY:
                 self.email
 
             )
+
+        )
+
+        print(
+
+            "Ollama:",
+
+            self.llm.get_status()
 
         )
 
