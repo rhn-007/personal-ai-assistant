@@ -118,7 +118,7 @@ def nexus_animation(stop_event):
 
     print(
 
-        "\r" + " " * 50 + "\r",
+        "\r" + " " * 100 + "\r",
 
         end="",
 
@@ -289,14 +289,6 @@ def chat():
 
             # -------------------------------------------------
             # PROCESS REQUEST
-            #
-            # IMPORTANT:
-            #
-            # There is intentionally NO print()
-            # before process_with_animation().
-            #
-            # This ensures the animation appears
-            # immediately after the final log line.
             # -------------------------------------------------
 
             response = (
