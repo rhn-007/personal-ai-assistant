@@ -1,5 +1,10 @@
 """
-Planner - Decides whether a user request requires a tool
+Planner - Decides whether a user request requires a tool.
+
+The planner is intentionally conservative.
+
+Mentioning a tool or application does not automatically
+mean the user wants to use it.
 """
 
 import re
@@ -21,6 +26,21 @@ class Planner:
         )
 
     # =====================================================
+    # COMPATIBILITY METHOD
+    # =====================================================
+
+    def create_plan(self, query: str):
+
+        """
+        Compatibility method.
+
+        Existing ToolManager and AgentLoop code expect
+        Planner.create_plan().
+        """
+
+        return self.plan(query)
+
+    # =====================================================
     # MAIN PLANNER
     # =====================================================
 
@@ -36,214 +56,98 @@ class Planner:
         # SPOTIFY
         # =================================================
 
-        spotify_action = self._plan_spotify(text)
+        spotify_plan = self._plan_spotify(text)
 
-        if spotify_action:
+        if spotify_plan:
 
-            return spotify_action
+            return spotify_plan
 
         # =================================================
         # CALENDAR
         # =================================================
 
-        calendar_action = self._plan_calendar(text)
+        calendar_plan = self._plan_calendar(text)
 
-        if calendar_action:
+        if calendar_plan:
 
-            return calendar_action
+            return calendar_plan
 
         # =================================================
         # SYSTEM
         # =================================================
 
-        system_action = self._plan_system(text)
+        system_plan = self._plan_system(text)
 
-        if system_action:
+        if system_plan:
 
-            return system_action
+            return system_plan
 
         # =================================================
         # BROWSER
         # =================================================
 
-        browser_action = self._plan_browser(text)
+        browser_plan = self._plan_browser(text)
 
-        if browser_action:
+        if browser_plan:
 
-            return browser_action
+            return browser_plan
 
         # =================================================
         # EMAIL
         # =================================================
 
-        email_action = self._plan_email(text)
+        email_plan = self._plan_email(text)
 
-        if email_action:
+        if email_plan:
 
-            return email_action
+            return email_plan
 
         # =================================================
-        # NO TOOL REQUIRED
+        # NORMAL CONVERSATION
         # =================================================
 
         return None
 
     # =====================================================
-    # SPOTIFY PLANNER
+    # SPOTIFY
     # =====================================================
 
     def _plan_spotify(self, text):
 
+        """
+        Spotify should only activate when the user clearly
+        intends to control or search Spotify.
+
+        Merely mentioning Spotify is not enough.
+        """
+
         # -------------------------------------------------
-        # IMPORTANT:
-        # Mentioning Spotify alone is NOT a command.
-        #
-        # Example:
-        # "I am building an assistant integrated with Spotify"
-        #
-        # Must NOT trigger Spotify.
+        # CLEAR PLAY COMMANDS
         # -------------------------------------------------
 
-        spotify_command_words = [
-
-            "play",
-
-            "pause",
-
-            "resume",
-
-            "stop",
-
-            "skip",
-
-            "next song",
-
-            "previous song",
-
-            "previous track",
-
-            "next track",
-
-            "volume up",
-
-            "volume down",
-
-            "increase volume",
-
-            "decrease volume",
-
-            "mute",
-
-            "unmute",
-
-            "shuffle",
-
-            "repeat"
-
-        ]
-
-        spotify_search_phrases = [
-
-            "play song",
+        play_phrases = [
 
             "play music",
 
-            "play track",
+            "play a song",
 
-            "play artist",
+            "play song",
+
+            "play some music",
+
+            "play track",
 
             "play album",
 
+            "play artist",
+
             "listen to",
 
-            "search spotify for",
-
-            "find on spotify"
+            "put on"
 
         ]
 
-        # -------------------------------------------------
-        # PLAYBACK COMMANDS
-        # -------------------------------------------------
-
-        for command in spotify_command_words:
-
-            if re.search(
-
-                rf"\b{re.escape(command)}\b",
-
-                text
-
-            ):
-
-                # Avoid treating normal conversational
-                # sentences containing "play" as commands.
-
-                if command in [
-
-                    "play",
-
-                    "pause",
-
-                    "resume",
-
-                    "stop"
-
-                ]:
-
-                    if not any(
-
-                        phrase in text
-
-                        for phrase in [
-
-                            "play music",
-
-                            "play song",
-
-                            "play track",
-
-                            "play album",
-
-                            "play artist",
-
-                            "pause spotify",
-
-                            "resume spotify",
-
-                            "stop spotify",
-
-                            "stop music",
-
-                            "pause music",
-
-                            "resume music"
-
-                        ]
-
-                    ):
-
-                        continue
-
-                return {
-
-                    "tool": "spotify",
-
-                    "action": self._spotify_action(
-
-                        text
-
-                    ),
-
-                    "query": text
-
-                }
-
-        # -------------------------------------------------
-        # SEARCH / PLAY MUSIC
-        # -------------------------------------------------
-
-        for phrase in spotify_search_phrases:
+        for phrase in play_phrases:
 
             if phrase in text:
 
@@ -257,59 +161,141 @@ class Planner:
 
                 }
 
-        return None
-
-    # =====================================================
-    # SPOTIFY ACTION
-    # =====================================================
-
-    def _spotify_action(self, text):
+        # -------------------------------------------------
+        # CLEAR PAUSE COMMANDS
+        # -------------------------------------------------
 
         if (
 
-            "pause" in text
+            "pause spotify" in text
+
+            or "pause music" in text
+
+            or text == "pause"
 
         ):
 
-            return "pause"
+            return {
+
+                "tool": "spotify",
+
+                "action": "pause",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # CLEAR RESUME COMMANDS
+        # -------------------------------------------------
 
         if (
 
-            "resume" in text
+            "resume spotify" in text
 
-            or "continue" in text
+            or "resume music" in text
+
+            or text == "resume"
+
+            or text == "continue"
 
         ):
 
-            return "resume"
+            return {
+
+                "tool": "spotify",
+
+                "action": "resume",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # CLEAR STOP COMMANDS
+        # -------------------------------------------------
 
         if (
 
-            "stop" in text
+            "stop spotify" in text
+
+            or "stop music" in text
+
+            or text == "stop"
 
         ):
 
-            return "stop"
+            return {
+
+                "tool": "spotify",
+
+                "action": "stop",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # NEXT TRACK
+        # -------------------------------------------------
 
         if (
 
-            "next" in text
+            "next song" in text
 
-            or "skip" in text
+            or "next track" in text
+
+            or "skip song" in text
+
+            or "skip track" in text
+
+            or text == "next"
+
+            or text == "skip"
 
         ):
 
-            return "next"
+            return {
+
+                "tool": "spotify",
+
+                "action": "next",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # PREVIOUS TRACK
+        # -------------------------------------------------
 
         if (
 
-            "previous" in text
+            "previous song" in text
 
-            or "back" in text
+            or "previous track" in text
+
+            or "previous song" in text
+
+            or text == "previous"
+
+            or text == "back"
 
         ):
 
-            return "previous"
+            return {
+
+                "tool": "spotify",
+
+                "action": "previous",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # VOLUME
+        # -------------------------------------------------
 
         if (
 
@@ -317,9 +303,19 @@ class Planner:
 
             or "increase volume" in text
 
+            or "turn up the volume" in text
+
         ):
 
-            return "volume_up"
+            return {
+
+                "tool": "spotify",
+
+                "action": "volume_up",
+
+                "query": text
+
+            }
 
         if (
 
@@ -327,27 +323,107 @@ class Planner:
 
             or "decrease volume" in text
 
+            or "turn down the volume" in text
+
         ):
 
-            return "volume_down"
+            return {
+
+                "tool": "spotify",
+
+                "action": "volume_down",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # SHUFFLE
+        # -------------------------------------------------
 
         if (
 
-            "shuffle" in text
+            "shuffle spotify" in text
+
+            or "shuffle music" in text
+
+            or text == "shuffle"
 
         ):
 
-            return "shuffle"
+            return {
+
+                "tool": "spotify",
+
+                "action": "shuffle",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # REPEAT
+        # -------------------------------------------------
 
         if (
 
-            "repeat" in text
+            "repeat song" in text
+
+            or "repeat track" in text
+
+            or "repeat music" in text
+
+            or text == "repeat"
 
         ):
 
-            return "repeat"
+            return {
 
-        return "play"
+                "tool": "spotify",
+
+                "action": "repeat",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # SEARCH SPOTIFY
+        # -------------------------------------------------
+
+        if (
+
+            "search spotify for" in text
+
+            or "find on spotify" in text
+
+            or "search on spotify" in text
+
+        ):
+
+            return {
+
+                "tool": "spotify",
+
+                "action": "play",
+
+                "query": text
+
+            }
+
+        # -------------------------------------------------
+        # IMPORTANT
+        # -------------------------------------------------
+
+        # The following must return None:
+        #
+        # "I am building an AI assistant integrated with Spotify"
+        #
+        # "I am working on a Spotify project"
+        #
+        # "Spotify is my favorite music app"
+
+        return None
 
     # =====================================================
     # CALENDAR
@@ -355,7 +431,7 @@ class Planner:
 
     def _plan_calendar(self, text):
 
-        calendar_words = [
+        calendar_phrases = [
 
             "remind me",
 
@@ -363,21 +439,23 @@ class Planner:
 
             "create a reminder",
 
-            "schedule",
+            "schedule a reminder",
 
-            "calendar",
+            "schedule an event",
 
-            "appointment",
+            "create an event",
 
-            "event"
+            "calendar event",
+
+            "appointment"
 
         ]
 
         if any(
 
-            word in text
+            phrase in text
 
-            for word in calendar_words
+            for phrase in calendar_phrases
 
         ):
 
@@ -399,7 +477,7 @@ class Planner:
 
     def _plan_system(self, text):
 
-        system_words = [
+        command_words = [
 
             "open",
 
@@ -409,7 +487,7 @@ class Planner:
 
         ]
 
-        known_targets = [
+        targets = [
 
             "notepad",
 
@@ -431,25 +509,35 @@ class Planner:
 
         ]
 
-        if (
+        has_command = any(
 
-            any(
+            re.search(
 
-                word in text
+                rf"\b{re.escape(word)}\b",
 
-                for word in system_words
-
-            )
-
-            and any(
-
-                target in text
-
-                for target in known_targets
+                text
 
             )
 
-        ):
+            for word in command_words
+
+        )
+
+        has_target = any(
+
+            re.search(
+
+                rf"\b{re.escape(target)}\b",
+
+                text
+
+            )
+
+            for target in targets
+
+        )
+
+        if has_command and has_target:
 
             return {
 
@@ -469,11 +557,9 @@ class Planner:
 
     def _plan_browser(self, text):
 
-        browser_words = [
+        browser_phrases = [
 
             "search for",
-
-            "search",
 
             "look up",
 
@@ -497,9 +583,9 @@ class Planner:
 
         if any(
 
-            word in text
+            phrase in text
 
-            for word in browser_words
+            for phrase in browser_phrases
 
         ):
 
@@ -521,23 +607,25 @@ class Planner:
 
     def _plan_email(self, text):
 
-        email_words = [
+        email_phrases = [
 
             "send an email",
 
             "send email",
 
+            "compose an email",
+
             "compose email",
 
-            "email to"
+            "write an email"
 
         ]
 
         if any(
 
-            word in text
+            phrase in text
 
-            for word in email_words
+            for phrase in email_phrases
 
         ):
 
