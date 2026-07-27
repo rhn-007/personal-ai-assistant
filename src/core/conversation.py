@@ -1,5 +1,6 @@
 """
-Conversation Management - Handles conversation flow and context
+Conversation Management
+Handles conversation flow, context, and persistent history.
 """
 
 from typing import List, Dict
@@ -8,11 +9,19 @@ from datetime import datetime
 from src.core.memory import MemoryManager
 from src.utils.logger import setup_logger
 
+
 logger = setup_logger(__name__)
 
 
 class ConversationManager:
-    """Manages conversation flow and context"""
+    """
+    Manages:
+
+    - Current conversation context
+    - Persistent conversation history
+    - Context loading after restart
+    - Conversation trimming
+    """
 
     def __init__(
         self,
@@ -26,9 +35,9 @@ class ConversationManager:
             max_context_messages
         )
 
-        # -------------------------------------------------
+        # =====================================================
         # SYSTEM PROMPT
-        # -------------------------------------------------
+        # =====================================================
 
         self.system_prompt = {
 
@@ -37,22 +46,31 @@ class ConversationManager:
             "content": (
                 "You are a helpful, intelligent "
                 "personal AI assistant. "
-                "Be concise, accurate, and helpful."
+                "Be concise, accurate, and helpful. "
+                "Use the conversation history when "
+                "answering questions about previous "
+                "messages."
             )
 
         }
 
-        # -------------------------------------------------
-        # LOAD PREVIOUS CONVERSATION HISTORY
-        # -------------------------------------------------
+        # =====================================================
+        # CURRENT CONTEXT
+        # =====================================================
 
-        self.current_context = []
+        self.current_context: List[
+            Dict[str, str]
+        ] = []
+
+        # =====================================================
+        # LOAD PERSISTENT HISTORY
+        # =====================================================
 
         self._load_history()
 
-    # =====================================================
+    # =========================================================
     # LOAD HISTORY
-    # =====================================================
+    # =========================================================
 
     def _load_history(self):
 
@@ -70,12 +88,24 @@ class ConversationManager:
 
             for exchange in history:
 
-                user_message = exchange.get(
-                    "user"
+                user_message = (
+
+                    exchange.get(
+
+                        "user"
+
+                    )
+
                 )
 
-                assistant_message = exchange.get(
-                    "assistant"
+                assistant_message = (
+
+                    exchange.get(
+
+                        "assistant"
+
+                    )
+
                 )
 
                 if user_message:
@@ -111,13 +141,14 @@ class ConversationManager:
 
             logger.error(
 
-                f"Failed to load conversation history: {e}"
+                f"Failed to load conversation "
+                f"history: {e}"
 
             )
 
-    # =====================================================
+    # =========================================================
     # ADD EXCHANGE
-    # =====================================================
+    # =========================================================
 
     def add_exchange(
 
@@ -129,9 +160,27 @@ class ConversationManager:
 
     ) -> None:
 
+        if not user_message:
+
+            return
+
+        if assistant_response is None:
+
+            assistant_response = ""
+
+        assistant_response = str(
+
+            assistant_response
+
+        )
+
         exchange = {
 
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": (
+
+                datetime.now().isoformat()
+
+            ),
 
             "user": user_message,
 
@@ -139,7 +188,9 @@ class ConversationManager:
 
         }
 
-        # Save permanently
+        # -----------------------------------------------------
+        # SAVE PERMANENTLY
+        # -----------------------------------------------------
 
         self.memory_manager.save_exchange(
 
@@ -147,7 +198,9 @@ class ConversationManager:
 
         )
 
-        # Add to current context
+        # -----------------------------------------------------
+        # ADD TO CURRENT CONTEXT
+        # -----------------------------------------------------
 
         self.current_context.append({
 
@@ -167,21 +220,27 @@ class ConversationManager:
 
         self._trim_context()
 
-    # =====================================================
+    # =========================================================
     # GET CONTEXT
-    # =====================================================
+    # =========================================================
 
-    def get_context(self) -> List[Dict[str, str]]:
+    def get_context(
 
-        return [
+        self
 
-            self.system_prompt
+    ) -> List[Dict[str, str]]:
 
-        ] + self.current_context
+        return (
 
-    # =====================================================
+            [self.system_prompt]
+
+            + self.current_context
+
+        )
+
+    # =========================================================
     # TRIM CONTEXT
-    # =====================================================
+    # =========================================================
 
     def _trim_context(self):
 
@@ -199,13 +258,17 @@ class ConversationManager:
 
             self.current_context = (
 
-                self.current_context[-max_items:]
+                self.current_context[
+
+                    -max_items:
+
+                ]
 
             )
 
-    # =====================================================
-    # HISTORY
-    # =====================================================
+    # =========================================================
+    # GET HISTORY
+    # =========================================================
 
     def get_history(
 
@@ -225,9 +288,9 @@ class ConversationManager:
 
         )
 
-    # =====================================================
+    # =========================================================
     # CLEAR HISTORY
-    # =====================================================
+    # =========================================================
 
     def clear_history(self) -> None:
 
@@ -241,9 +304,9 @@ class ConversationManager:
 
         )
 
-    # =====================================================
-    # SYSTEM PROMPT
-    # =====================================================
+    # =========================================================
+    # SYSTEM CONTEXT
+    # =========================================================
 
     def add_system_context(
 
