@@ -1,9 +1,10 @@
 """
-Memory Management - Memory 4.0
+Memory Management - Memory 5.0
 
 Provides:
 
 - Conversation history
+- Intelligent conversation search
 - User profile memory
 - Semantic memory
 - Event memory
@@ -12,6 +13,7 @@ Provides:
 
 import sqlite3
 import json
+import re
 
 from datetime import datetime
 
@@ -23,9 +25,7 @@ from src.utils.logger import setup_logger
 
 
 logger = setup_logger(
-
     __name__
-
 )
 
 
@@ -33,6 +33,12 @@ class MemoryManager:
 
     """
     Advanced persistent memory system.
+
+    Memory 5.0 adds:
+
+    - Keyword-based conversation retrieval
+    - Relevant conversation search
+    - Improved contextual memory
     """
 
     def __init__(
@@ -161,7 +167,7 @@ class MemoryManager:
 
             logger.info(
 
-                "Memory database initialized."
+                "Memory 5.0 database initialized."
 
             )
 
@@ -636,6 +642,271 @@ class MemoryManager:
             ]
 
     # =========================================================
+    # 🧠 INTELLIGENT CONVERSATION SEARCH
+    # =========================================================
+
+    def search_conversations(
+
+        self,
+
+        query: str,
+
+        limit: int = 5
+
+    ) -> List[Dict]:
+
+        """
+        Search old conversations for relevant messages.
+
+        Example:
+
+            Query:
+                "What was I working on with Spotify?"
+
+        Searches for important words such as:
+
+            working
+            spotify
+
+        Then ranks conversations based on
+        the number of matching words.
+        """
+
+        if not query:
+
+            return []
+
+        # -------------------------------------------------
+        # NORMALIZE QUERY
+        # -------------------------------------------------
+
+        query = query.lower()
+
+        words = re.findall(
+
+            r"\b[a-zA-Z0-9]+\b",
+
+            query
+
+        )
+
+        # -------------------------------------------------
+        # REMOVE COMMON WORDS
+        # -------------------------------------------------
+
+        stop_words = {
+
+            "what",
+
+            "was",
+
+            "were",
+
+            "is",
+
+            "are",
+
+            "am",
+
+            "i",
+
+            "me",
+
+            "my",
+
+            "we",
+
+            "you",
+
+            "the",
+
+            "a",
+
+            "an",
+
+            "and",
+
+            "or",
+
+            "to",
+
+            "of",
+
+            "in",
+
+            "on",
+
+            "for",
+
+            "with",
+
+            "about",
+
+            "did",
+
+            "do",
+
+            "have",
+
+            "has",
+
+            "had",
+
+            "just",
+
+            "talk",
+
+            "talking",
+
+            "tell",
+
+            "remember",
+
+            "recall"
+
+        }
+
+        keywords = [
+
+            word
+
+            for word in words
+
+            if word not in stop_words
+
+            and len(word) > 2
+
+        ]
+
+        if not keywords:
+
+            return []
+
+        # -------------------------------------------------
+        # SEARCH DATABASE
+        # -------------------------------------------------
+
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cur = conn.cursor()
+
+            cur.execute(
+
+                """
+
+                SELECT
+
+                    id,
+
+                    timestamp,
+
+                    user_message,
+
+                    assistant_message
+
+                FROM conversations
+
+                ORDER BY id DESC
+
+                """
+
+            )
+
+            rows = cur.fetchall()
+
+        # -------------------------------------------------
+        # SCORE RESULTS
+        # -------------------------------------------------
+
+        matches = []
+
+        for row in rows:
+
+            conversation_id = row[0]
+
+            timestamp = row[1]
+
+            user_message = row[2] or ""
+
+            assistant_message = row[3] or ""
+
+            combined_text = (
+
+                user_message
+
+                + " "
+
+                + assistant_message
+
+            ).lower()
+
+            score = 0
+
+            matched_keywords = []
+
+            for keyword in keywords:
+
+                if keyword in combined_text:
+
+                    score += 1
+
+                    matched_keywords.append(
+
+                        keyword
+
+                    )
+
+            if score > 0:
+
+                matches.append({
+
+                    "id":
+
+                        conversation_id,
+
+                    "timestamp":
+
+                        timestamp,
+
+                    "user":
+
+                        user_message,
+
+                    "assistant":
+
+                        assistant_message,
+
+                    "score":
+
+                        score,
+
+                    "matched_keywords":
+
+                        matched_keywords
+
+                })
+
+        # -------------------------------------------------
+        # RANK RESULTS
+        # -------------------------------------------------
+
+        matches.sort(
+
+            key=lambda item:
+
+                item["score"],
+
+            reverse=True
+
+        )
+
+        return matches[:limit]
+
+    # =========================================================
     # RETRIEVE RELEVANT MEMORY
     # =========================================================
 
@@ -647,39 +918,45 @@ class MemoryManager:
 
     ) -> Dict:
 
+        """
+
+        Retrieve all memory relevant
+        to the current query.
+        """
+
+        conversations = (
+
+            self.search_conversations(
+
+                text,
+
+                limit=5
+
+            )
+
+        )
+
         return {
 
             "profile":
 
                 self.get_all_profile(),
 
+            "semantic":
+
+                self.get_all_semantic(),
+
             "events":
 
-                self.get_events(),
+                self.get_events(
 
-            "likes":
-
-                self.get_semantic_memory(
-
-                    "likes"
+                    limit=5
 
                 ),
 
-            "dislikes":
+            "conversations":
 
-                self.get_semantic_memory(
-
-                    "dislikes"
-
-                ),
-
-            "interests":
-
-                self.get_semantic_memory(
-
-                    "interests"
-
-                )
+                conversations
 
         }
 
@@ -694,6 +971,10 @@ class MemoryManager:
         text: str
 
     ):
+
+        if not text:
+
+            return
 
         t = text.lower()
 
@@ -757,7 +1038,11 @@ class MemoryManager:
 
             "games",
 
-            "python"
+            "python",
+
+            "robot",
+
+            "robotics"
 
         ]:
 
@@ -848,6 +1133,12 @@ class MemoryManager:
             )
 
             conn.commit()
+
+            logger.info(
+
+                "Conversation exchange saved."
+
+            )
 
     # =========================================================
     # GET CONVERSATION HISTORY
