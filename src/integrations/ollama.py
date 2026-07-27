@@ -1,23 +1,17 @@
 """
-Memory Management - Memory 5.0
+Ollama Integration
 
-Responsibilities:
+Provides:
 
-- Store user profile memory
-- Store semantic memory
-- Store important events
-- Store conversation history
-- Retrieve recent conversation history quickly
-- Retrieve searchable memory
-- Provide structured memory data to Ollama
+- Normal AI responses
+- Memory analysis
+- Relevant memory selection
+- Local LLM communication
 """
 
-import sqlite3
 import json
 
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Optional
+import ollama
 
 from src.utils.logger import setup_logger
 
@@ -25,828 +19,334 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-class MemoryManager:
+class OllamaIntegration:
 
-    """
-    Persistent memory system backed by SQLite.
-    """
-
-    def __init__(self, db_path: str = "data/history.db"):
-
-        self.db_path = db_path
-
-        self._ensure_db_exists()
-
-    # =========================================================
-    # DATABASE INITIALIZATION
-    # =========================================================
-
-    def _ensure_db_exists(self):
-
-        Path(self.db_path).parent.mkdir(
-            parents=True,
-            exist_ok=True
-        )
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    timestamp TEXT,
-
-                    user_message TEXT,
-
-                    assistant_message TEXT,
-
-                    metadata TEXT
-
-                )
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS user_profile (
-
-                    key TEXT PRIMARY KEY,
-
-                    value TEXT,
-
-                    updated_at TEXT
-
-                )
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS semantic_memory (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    category TEXT,
-
-                    value TEXT,
-
-                    weight INTEGER DEFAULT 1,
-
-                    last_used TEXT
-
-                )
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS events (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    type TEXT,
-
-                    content TEXT,
-
-                    importance INTEGER DEFAULT 1,
-
-                    timestamp TEXT
-
-                )
-            """)
-
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_semantic_category
-
-                ON semantic_memory(category)
-            """)
-
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_events_importance
-
-                ON events(importance DESC)
-            """)
-
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_conversations_id
-
-                ON conversations(id DESC)
-            """)
-
-            conn.commit()
-
-        logger.info("Memory database initialized.")
-
-    # =========================================================
-    # PROFILE MEMORY
-    # =========================================================
-
-    def set_profile(
+    def __init__(
         self,
-        key: str,
-        value: str
+        model="phi3"
     ):
 
-        if not key or not value:
+        self.model = model
 
-            return
+        self.system_prompt = """
 
-        with sqlite3.connect(self.db_path) as conn:
+You are JARVIS, a highly intelligent personal AI assistant.
 
-            conn.execute("""
-                INSERT INTO user_profile
-                (
-                    key,
-                    value,
-                    updated_at
-                )
-                VALUES (?, ?, ?)
+You run locally through Ollama.
 
-                ON CONFLICT(key)
+Your responsibilities:
 
-                DO UPDATE SET
+1. Understand what the user means.
+2. Answer accurately and naturally.
+3. Use conversation context when relevant.
+4. Use memory when relevant.
+5. Do not invent facts.
+6. Never claim to perform an action unless a tool actually performed it.
+7. Be concise for simple questions.
+8. Be detailed when the user requests detail.
+9. If you do not know something, say so honestly.
 
-                    value = excluded.value,
+PERSONALITY:
 
-                    updated_at = excluded.updated_at
-            """, (
-                key.strip(),
-                value.strip(),
-                datetime.now().isoformat()
-            ))
+You are calm, intelligent, helpful, professional, and natural.
 
-            conn.commit()
+You should feel like an advanced personal computer assistant.
 
-        logger.info(
-            f"Profile memory updated: {key}"
-        )
+Do not call the user "sir" constantly.
+
+Do not be unnecessarily dramatic.
+
+Do not mention internal programming unless asked.
+
+"""
 
     # =========================================================
-    # GET PROFILE
+    # NORMAL RESPONSE
     # =========================================================
 
-    def get_profile(
+    def generate_response(
         self,
-        key: str
-    ) -> Optional[str]:
+        user_input: str,
+        context=None
+    ) -> str:
 
-        with sqlite3.connect(self.db_path) as conn:
+        try:
 
-            cursor = conn.cursor()
+            messages = [
 
-            cursor.execute("""
-                SELECT value
+                {
+                    "role": "system",
 
-                FROM user_profile
+                    "content": self.system_prompt
 
-                WHERE key = ?
-            """, (key,))
+                }
 
-            row = cursor.fetchone()
-
-            if row:
-
-                return row[0]
-
-            return None
-
-    # =========================================================
-    # GET ALL PROFILE
-    # =========================================================
-
-    def get_all_profile(self) -> Dict:
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT key, value
-
-                FROM user_profile
-
-                ORDER BY updated_at DESC
-            """)
-
-            return dict(cursor.fetchall())
-
-    # =========================================================
-    # SEMANTIC MEMORY
-    # =========================================================
-
-    def add_semantic_memory(
-        self,
-        category: str,
-        value: str
-    ):
-
-        if not category or not value:
-
-            return
-
-        category = category.strip()
-        value = value.strip()
-
-        if not category or not value:
-
-            return
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, weight
-
-                FROM semantic_memory
-
-                WHERE category = ?
-
-                AND value = ?
-            """, (
-                category,
-                value
-            ))
-
-            row = cursor.fetchone()
-
-            if row:
-
-                cursor.execute("""
-                    UPDATE semantic_memory
-
-                    SET
-
-                        weight = weight + 1,
-
-                        last_used = ?
-
-                    WHERE id = ?
-                """, (
-                    datetime.now().isoformat(),
-                    row[0]
-                ))
-
-            else:
-
-                cursor.execute("""
-                    INSERT INTO semantic_memory
-                    (
-                        category,
-                        value,
-                        weight,
-                        last_used
-                    )
-
-                    VALUES (?, ?, ?, ?)
-                """, (
-                    category,
-                    value,
-                    1,
-                    datetime.now().isoformat()
-                ))
-
-            conn.commit()
-
-    # =========================================================
-    # GET SEMANTIC MEMORY
-    # =========================================================
-
-    def get_semantic_memory(
-        self,
-        category: str,
-        limit: int = 50
-    ) -> List[str]:
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT value
-
-                FROM semantic_memory
-
-                WHERE category = ?
-
-                ORDER BY weight DESC, last_used DESC
-
-                LIMIT ?
-            """, (
-                category,
-                limit
-            ))
-
-            return [
-                row[0]
-                for row in cursor.fetchall()
             ]
 
-    # =========================================================
-    # GET ALL SEMANTIC MEMORY
-    # =========================================================
+            if context:
 
-    def get_all_semantic(self) -> Dict:
+                for message in context:
 
-        with sqlite3.connect(self.db_path) as conn:
+                    if not isinstance(
+                        message,
+                        dict
+                    ):
 
-            cursor = conn.cursor()
+                        continue
 
-            cursor.execute("""
-                SELECT category, value, weight
+                    role = message.get(
+                        "role"
+                    )
 
-                FROM semantic_memory
+                    content = message.get(
+                        "content"
+                    )
 
-                ORDER BY weight DESC, last_used DESC
-            """)
+                    if not role or not content:
 
-            rows = cursor.fetchall()
+                        continue
 
-        result = {}
+                    if (
 
-        for category, value, weight in rows:
+                        role == "system"
 
-            if category not in result:
+                        and content == self.system_prompt
 
-                result[category] = []
+                    ):
 
-            result[category].append({
-                "value": value,
-                "weight": weight
+                        continue
+
+                    messages.append({
+
+                        "role": role,
+
+                        "content": content
+
+                    })
+
+            messages.append({
+
+                "role": "user",
+
+                "content": user_input
+
             })
 
-        return result
+            response = ollama.chat(
 
-    # =========================================================
-    # EVENTS
-    # =========================================================
+                model=self.model,
 
-    def add_event(
-        self,
-        event_type: str,
-        content: str,
-        importance: int = 1
-    ):
+                messages=messages,
 
-        if not content:
+                options={
 
-            return
+                    "temperature": 0.3,
 
-        with sqlite3.connect(self.db_path) as conn:
+                    "num_ctx": 4096
 
-            conn.execute("""
-                INSERT INTO events
-                (
-                    type,
-                    content,
-                    importance,
-                    timestamp
+                }
+
+            )
+
+            if not response:
+
+                return (
+                    "I was unable to generate "
+                    "a response."
                 )
 
-                VALUES (?, ?, ?, ?)
-            """, (
-                event_type,
-                content,
-                importance,
-                datetime.now().isoformat()
-            ))
+            message = response.get(
+                "message"
+            )
 
-            conn.commit()
+            if not message:
 
-    # =========================================================
-    # GET EVENTS
-    # =========================================================
-
-    def get_events(
-        self,
-        limit: int = 10
-    ) -> List[Dict]:
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT
-
-                    type,
-
-                    content,
-
-                    importance,
-
-                    timestamp
-
-                FROM events
-
-                ORDER BY importance DESC, id DESC
-
-                LIMIT ?
-            """, (limit,))
-
-            rows = cursor.fetchall()
-
-        return [
-
-            {
-                "type": row[0],
-                "content": row[1],
-                "importance": row[2],
-                "timestamp": row[3]
-            }
-
-            for row in rows
-
-        ]
-
-    # =========================================================
-    # SAVE CONVERSATION
-    # =========================================================
-
-    def save_exchange(
-        self,
-        exchange: Dict
-    ):
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            conn.execute("""
-                INSERT INTO conversations
-                (
-                    timestamp,
-
-                    user_message,
-
-                    assistant_message,
-
-                    metadata
+                return (
+                    "I was unable to generate "
+                    "a response."
                 )
 
-                VALUES (?, ?, ?, ?)
-            """, (
+            content = message.get(
+                "content"
+            )
 
-                exchange.get(
-                    "timestamp",
-                    datetime.now().isoformat()
-                ),
+            if not content:
 
-                exchange.get(
-                    "user",
-                    ""
-                ),
-
-                exchange.get(
-                    "assistant",
-                    ""
-                ),
-
-                json.dumps(
-                    exchange.get(
-                        "metadata",
-                        {}
-                    )
+                return (
+                    "I received an empty response "
+                    "from the local AI model."
                 )
 
-            ))
+            return content.strip()
 
-            conn.commit()
+        except Exception as e:
+
+            logger.error(
+                f"Ollama response error: {e}"
+            )
+
+            return (
+                f"Ollama error: {str(e)}"
+            )
 
     # =========================================================
-    # GET RECENT HISTORY
+    # MEMORY ANALYSIS
     # =========================================================
 
-    def get_history(
+    def analyze_memory(
         self,
-        limit: int = 10
-    ) -> List[Dict]:
+        user_query: str,
+        memory_snapshot: dict
+    ) -> dict:
 
-        with sqlite3.connect(self.db_path) as conn:
+        """
+        Uses Ollama to select only memory relevant
+        to the user's current question.
+        """
 
-            cursor = conn.cursor()
+        memory_json = json.dumps(
+            memory_snapshot,
+            ensure_ascii=False
+        )
 
-            cursor.execute("""
-                SELECT
+        prompt = f"""
 
-                    timestamp,
+You are the memory retrieval system for a personal AI assistant.
 
-                    user_message,
+The user asked:
 
-                    assistant_message
+{user_query}
 
-                FROM conversations
+Below is the assistant's stored memory:
 
-                ORDER BY id DESC
+{memory_json}
 
-                LIMIT ?
-            """, (limit,))
+Your task:
 
-            rows = cursor.fetchall()
+Select only the memories relevant to answering the user's
+current question.
 
-        return list(
-            reversed(
-                [
+Rules:
+
+1. Do not invent information.
+2. Do not change facts.
+3. Do not create new memories.
+4. If the user asks what they remember, include relevant past conversations.
+5. If the user asks about a specific topic, prioritize conversations about that topic.
+6. If the user asks about the last conversation, prioritize the most recent relevant conversation.
+7. If the user asks about the user personally, prioritize profile and semantic memory.
+8. Keep the result concise.
+9. Return ONLY valid JSON.
+
+Use exactly this structure:
+
+{{
+    "profile": {{}},
+    "semantic_memory": {{}},
+    "events": [],
+    "conversations": []
+}}
+
+"""
+
+        try:
+
+            response = ollama.chat(
+
+                model=self.model,
+
+                messages=[
+
                     {
-                        "timestamp": row[0],
-                        "user": row[1],
-                        "assistant": row[2]
+
+                        "role": "system",
+
+                        "content": (
+
+                            "You are a precise memory "
+                            "retrieval engine. "
+                            "Return only valid JSON."
+                        )
+
+                    },
+
+                    {
+
+                        "role": "user",
+
+                        "content": prompt
+
                     }
 
-                    for row in rows
-                ]
-            )
-        )
+                ],
 
-    # =========================================================
-    # GET ALL CONVERSATIONS
-    # =========================================================
+                format="json",
 
-    def get_all_conversations(
-        self,
-        limit: int = 100
-    ) -> List[Dict]:
+                options={
 
-        with sqlite3.connect(self.db_path) as conn:
+                    "temperature": 0.0,
 
-            cursor = conn.cursor()
+                    "num_ctx": 4096
 
-            cursor.execute("""
-                SELECT
+                }
 
-                    timestamp,
-
-                    user_message,
-
-                    assistant_message
-
-                FROM conversations
-
-                ORDER BY id DESC
-
-                LIMIT ?
-            """, (limit,))
-
-            rows = cursor.fetchall()
-
-        return [
-
-            {
-                "timestamp": row[0],
-                "user": row[1],
-                "assistant": row[2]
-            }
-
-            for row in rows
-
-        ]
-
-    # =========================================================
-    # SEARCH CONVERSATIONS
-    # =========================================================
-
-    def search_conversations(
-        self,
-        query: str,
-        limit: int = 10
-    ) -> List[Dict]:
-
-        if not query:
-
-            return []
-
-        words = [
-
-            word.strip(
-                ".,!?;:()[]{}\"'"
-            ).lower()
-
-            for word in query.split()
-
-            if len(
-                word.strip(
-                    ".,!?;:()[]{}\"'"
-                )
-            ) > 2
-
-        ]
-
-        if not words:
-
-            return []
-
-        conditions = []
-
-        parameters = []
-
-        for word in words:
-
-            conditions.append("""
-                (
-                    LOWER(user_message) LIKE ?
-
-                    OR
-
-                    LOWER(assistant_message) LIKE ?
-                )
-            """)
-
-            parameters.extend([
-                f"%{word}%",
-                f"%{word}%"
-            ])
-
-        where_clause = " OR ".join(
-            conditions
-        )
-
-        parameters.append(limit)
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
-                f"""
-                SELECT
-
-                    timestamp,
-
-                    user_message,
-
-                    assistant_message
-
-                FROM conversations
-
-                WHERE {where_clause}
-
-                ORDER BY id DESC
-
-                LIMIT ?
-                """,
-                parameters
             )
 
-            rows = cursor.fetchall()
+            content = (
 
-        return [
+                response
 
-            {
-                "timestamp": row[0],
-                "user": row[1],
-                "assistant": row[2]
-            }
+                .get(
 
-            for row in rows
+                    "message",
 
-        ]
+                    {}
 
-    # =========================================================
-    # RAW MEMORY SNAPSHOT
-    # =========================================================
+                )
 
-    def get_memory_snapshot(
-        self,
-        conversation_limit: int = 50
-    ) -> Dict:
+                .get(
 
-        """
-        Returns the complete structured memory snapshot.
+                    "content",
 
-        Ollama can decide which parts are relevant.
-        """
+                    "{}"
 
-        return {
+                )
 
-            "profile": self.get_all_profile(),
-
-            "semantic_memory": self.get_all_semantic(),
-
-            "events": self.get_events(20),
-
-            "conversations": self.get_all_conversations(
-                conversation_limit
             )
 
-        }
-
-    # =========================================================
-    # AUTO LEARNING
-    # =========================================================
-
-    def auto_learn(
-        self,
-        text: str
-    ):
-
-        if not text:
-
-            return
-
-        original_text = text.strip()
-
-        lower_text = original_text.lower()
-
-        # -----------------------------------------------------
-        # NAME
-        # -----------------------------------------------------
-
-        if "my name is" in lower_text:
-
-            name = original_text.split(
-                "my name is",
-                1
-            )[1].strip()
-
-            if name:
-
-                self.set_profile(
-                    "name",
-                    name
-                )
-
-        # -----------------------------------------------------
-        # LIKES
-        # -----------------------------------------------------
-
-        if "i like" in lower_text:
-
-            value = original_text.split(
-                "i like",
-                1
-            )[1].strip()
-
-            if value:
-
-                self.add_semantic_memory(
-                    "likes",
-                    value
-                )
-
-        # -----------------------------------------------------
-        # DISLIKES
-        # -----------------------------------------------------
-
-        if "i hate" in lower_text:
-
-            value = original_text.split(
-                "i hate",
-                1
-            )[1].strip()
-
-            if value:
-
-                self.add_semantic_memory(
-                    "dislikes",
-                    value
-                )
-
-        # -----------------------------------------------------
-        # INTERESTS
-        # -----------------------------------------------------
-
-        interests = [
-
-            "ai",
-
-            "python",
-
-            "coding",
-
-            "anime",
-
-            "music",
-
-            "games",
-
-            "robot",
-
-            "robotics",
-
-            "spotify",
-
-            "programming"
-
-        ]
-
-        for interest in interests:
-
-            if interest in lower_text:
-
-                self.add_semantic_memory(
-                    "interests",
-                    interest
-                )
-
-    # =========================================================
-    # CLEAR CONVERSATION HISTORY
-    # =========================================================
-
-    def clear_history(self):
-
-        with sqlite3.connect(self.db_path) as conn:
-
-            conn.execute(
-                "DELETE FROM conversations"
+            result = json.loads(
+                content
             )
 
-            conn.commit()
+            if not isinstance(
+                result,
+                dict
+            ):
 
-        logger.info(
-            "Conversation history cleared."
-        )
+                return {}
+
+            return result
+
+        except Exception as e:
+
+            logger.error(
+                f"Memory analysis error: {e}"
+            )
+
+            return {}
+
+    # =========================================================
+    # STATUS
+    # =========================================================
+
+    def get_status(self):
+
+        try:
+
+            ollama.list()
+
+            return "ONLINE"
+
+        except Exception:
+
+            return "OFFLINE"
