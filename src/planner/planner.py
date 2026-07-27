@@ -31,13 +31,6 @@ class Planner:
 
     def create_plan(self, query: str):
 
-        """
-        Compatibility method.
-
-        Existing ToolManager and AgentLoop code expect
-        Planner.create_plan().
-        """
-
         return self.plan(query)
 
     # =====================================================
@@ -102,10 +95,6 @@ class Planner:
 
             return email_plan
 
-        # =================================================
-        # NORMAL CONVERSATION
-        # =================================================
-
         return None
 
     # =====================================================
@@ -114,64 +103,19 @@ class Planner:
 
     def _plan_spotify(self, text):
 
-        """
-        Spotify should only activate when the user clearly
-        intends to control or search Spotify.
-
-        Merely mentioning Spotify is not enough.
-        """
-
         # -------------------------------------------------
-        # CLEAR PLAY COMMANDS
-        # -------------------------------------------------
-
-        play_phrases = [
-
-            "play music",
-
-            "play a song",
-
-            "play song",
-
-            "play some music",
-
-            "play track",
-
-            "play album",
-
-            "play artist",
-
-            "listen to",
-
-            "put on"
-
-        ]
-
-        for phrase in play_phrases:
-
-            if phrase in text:
-
-                return {
-
-                    "tool": "spotify",
-
-                    "action": "play",
-
-                    "query": text
-
-                }
-
-        # -------------------------------------------------
-        # CLEAR PAUSE COMMANDS
+        # PAUSE
         # -------------------------------------------------
 
         if (
 
-            "pause spotify" in text
+            text == "pause"
+
+            or "pause spotify" in text
 
             or "pause music" in text
 
-            or text == "pause"
+            or "pause the music" in text
 
         ):
 
@@ -186,18 +130,18 @@ class Planner:
             }
 
         # -------------------------------------------------
-        # CLEAR RESUME COMMANDS
+        # RESUME
         # -------------------------------------------------
 
         if (
 
-            "resume spotify" in text
-
-            or "resume music" in text
-
-            or text == "resume"
+            text == "resume"
 
             or text == "continue"
+
+            or "resume spotify" in text
+
+            or "resume music" in text
 
         ):
 
@@ -212,16 +156,16 @@ class Planner:
             }
 
         # -------------------------------------------------
-        # CLEAR STOP COMMANDS
+        # STOP
         # -------------------------------------------------
 
         if (
 
-            "stop spotify" in text
+            text == "stop"
+
+            or "stop spotify" in text
 
             or "stop music" in text
-
-            or text == "stop"
 
         ):
 
@@ -236,22 +180,22 @@ class Planner:
             }
 
         # -------------------------------------------------
-        # NEXT TRACK
+        # NEXT
         # -------------------------------------------------
 
         if (
 
-            "next song" in text
+            text == "next"
+
+            or text == "skip"
+
+            or "next song" in text
 
             or "next track" in text
 
             or "skip song" in text
 
             or "skip track" in text
-
-            or text == "next"
-
-            or text == "skip"
 
         ):
 
@@ -266,20 +210,20 @@ class Planner:
             }
 
         # -------------------------------------------------
-        # PREVIOUS TRACK
+        # PREVIOUS
         # -------------------------------------------------
 
         if (
 
-            "previous song" in text
+            text == "previous"
 
-            or "previous track" in text
+            or text == "back"
 
             or "previous song" in text
 
-            or text == "previous"
+            or "previous track" in text
 
-            or text == "back"
+            or "previous music" in text
 
         ):
 
@@ -294,7 +238,7 @@ class Planner:
             }
 
         # -------------------------------------------------
-        # VOLUME
+        # VOLUME UP
         # -------------------------------------------------
 
         if (
@@ -304,6 +248,8 @@ class Planner:
             or "increase volume" in text
 
             or "turn up the volume" in text
+
+            or "louder" in text
 
         ):
 
@@ -317,6 +263,10 @@ class Planner:
 
             }
 
+        # -------------------------------------------------
+        # VOLUME DOWN
+        # -------------------------------------------------
+
         if (
 
             "volume down" in text
@@ -324,6 +274,8 @@ class Planner:
             or "decrease volume" in text
 
             or "turn down the volume" in text
+
+            or "quieter" in text
 
         ):
 
@@ -343,11 +295,11 @@ class Planner:
 
         if (
 
-            "shuffle spotify" in text
+            text == "shuffle"
+
+            or "shuffle spotify" in text
 
             or "shuffle music" in text
-
-            or text == "shuffle"
 
         ):
 
@@ -367,13 +319,13 @@ class Planner:
 
         if (
 
-            "repeat song" in text
+            text == "repeat"
+
+            or "repeat song" in text
 
             or "repeat track" in text
 
             or "repeat music" in text
-
-            or text == "repeat"
 
         ):
 
@@ -387,41 +339,104 @@ class Planner:
 
             }
 
-        # -------------------------------------------------
+        # =================================================
+        # PLAY MUSIC
+        # =================================================
+
+        # Explicit play commands
+        #
+        # Examples:
+        #
+        # play blinding lights
+        # play the weeknd
+        # play some music
+        # play music
+        # play song blinding lights
+        # listen to blinding lights
+        # put on blinding lights
+
+        play_match = re.match(
+
+            r"^(?:please\s+)?"
+
+            r"(?:play|listen to|put on)"
+
+            r"(?:\s+(?:the|song|music|track|album|artist))?"
+
+            r"\s+(.+)$",
+
+            text
+
+        )
+
+        if play_match:
+
+            query = play_match.group(1).strip()
+
+            if query:
+
+                return {
+
+                    "tool": "spotify",
+
+                    "action": "play",
+
+                    "query": query
+
+                }
+
+        # =================================================
         # SEARCH SPOTIFY
-        # -------------------------------------------------
+        # =================================================
 
-        if (
+        search_patterns = [
 
-            "search spotify for" in text
+            r"search spotify for (.+)",
 
-            or "find on spotify" in text
+            r"search on spotify for (.+)",
 
-            or "search on spotify" in text
+            r"find on spotify (.+)",
 
-        ):
+            r"find (.+) on spotify"
 
-            return {
+        ]
 
-                "tool": "spotify",
+        for pattern in search_patterns:
 
-                "action": "play",
+            match = re.match(
 
-                "query": text
+                pattern,
 
-            }
+                text
+
+            )
+
+            if match:
+
+                query = match.group(1).strip()
+
+                return {
+
+                    "tool": "spotify",
+
+                    "action": "play",
+
+                    "query": query
+
+                }
 
         # -------------------------------------------------
         # IMPORTANT
         # -------------------------------------------------
 
-        # The following must return None:
+        # These must NOT activate Spotify:
         #
-        # "I am building an AI assistant integrated with Spotify"
+        # I am working on an AI assistant integrated with Spotify
+        # I am building a Spotify project
+        # Spotify is my favorite app
+        # I use Spotify every day
         #
-        # "I am working on a Spotify project"
-        #
-        # "Spotify is my favorite music app"
+        # Because they do not contain a direct play/control command.
 
         return None
 
