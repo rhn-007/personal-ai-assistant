@@ -1,29 +1,59 @@
 """
 Main Assistant Class
+
 Memory + Tool System + Planner + Agent Loop
-+ Intelligent Memory Retrieval
+
+Architecture:
+
+User Input
+    ↓
+Memory Capture
+    ↓
+Direct Tool Execution
+    ↓
+Agent Loop
+    ↓
+Email Fallback
+    ↓
+Relevant Memory Retrieval
+    ↓
+Ollama LLM Fallback
 """
 
 from dotenv import load_dotenv
 
+
 from src.core.conversation import ConversationManager
+
 from src.core.memory import MemoryManager
 
+
 from src.integrations.ollama import OllamaIntegration
+
 from src.integrations.email import EmailIntegration
+
 
 from src.utils.logger import setup_logger
 
+
 from src.tools.system_tool import SystemTool
+
 from src.tools.tool_manager import ToolManager
+
 from src.tools.email_tool import EmailTool
+
 from src.tools.spotify_tool import SpotifyTool
+
 from src.tools.calendar_tool import CalendarTool
+
 from src.tools.browser_tool import BrowserTool
+
 
 from src.planner.planner import Planner
 
+
 from src.agent.task_manager import TaskManager
+
 from src.agent.agent_loop import AgentLoop
 
 
@@ -32,16 +62,53 @@ load_dotenv()
 
 class PersonalAssistant:
 
-    def __init__(self):
+    """
 
-        self.status = "INITIALIZING"
+    AI Assistant with:
+
+    - Conversation memory
+    - Semantic memory
+    - User profile memory
+    - Ollama LLM
+    - Email integration
+    - Calendar tools
+    - Spotify tools
+    - System tools
+    - Browser tools
+    - Planner
+    - Agent loop
+    """
+
+    def __init__(
+
+        self
+
+    ):
+
+        # =====================================================
+        # ASSISTANT STATUS
+        # =====================================================
+
+        self.status = (
+
+            "INITIALIZING"
+
+        )
+
+        # =====================================================
+        # LOGGER
+        # =====================================================
 
         self.logger = setup_logger(
+
             __name__
+
         )
 
         self.logger.info(
+
             "Initializing Assistant..."
+
         )
 
         # =====================================================
@@ -51,13 +118,15 @@ class PersonalAssistant:
         self.memory = MemoryManager()
 
         self.conversation = ConversationManager(
+
             self.memory
+
         )
 
         self.llm = OllamaIntegration()
 
         # =====================================================
-        # EMAIL
+        # EMAIL SYSTEM
         # =====================================================
 
         try:
@@ -65,7 +134,9 @@ class PersonalAssistant:
             self.email = EmailIntegration()
 
             self.logger.info(
+
                 "Email integration initialized."
+
             )
 
         except Exception as e:
@@ -73,7 +144,9 @@ class PersonalAssistant:
             self.email = None
 
             self.logger.warning(
+
                 f"Email integration unavailable: {e}"
+
             )
 
         # =====================================================
@@ -101,19 +174,27 @@ class PersonalAssistant:
         # =====================================================
 
         self.tool_manager.register(
+
             EmailTool()
+
         )
 
         self.tool_manager.register(
+
             SpotifyTool()
+
         )
 
         self.tool_manager.register(
+
             CalendarTool()
+
         )
 
         self.tool_manager.register(
+
             SystemTool()
+
         )
 
         self.tool_manager.register(
@@ -159,10 +240,14 @@ class PersonalAssistant:
         )
 
         # =====================================================
-        # READY
+        # ASSISTANT READY
         # =====================================================
 
-        self.status = "READY"
+        self.status = (
+
+            "READY"
+
+        )
 
         self.logger.info(
 
@@ -183,7 +268,7 @@ class PersonalAssistant:
         return self.status
 
     # =========================================================
-    # 🧠 INTELLIGENT MEMORY CONTEXT
+    # MEMORY CONTEXT
     # =========================================================
 
     def _get_memory_context(
@@ -196,8 +281,10 @@ class PersonalAssistant:
 
         """
 
-        Retrieves memory relevant
-        to the current query.
+        Retrieves only memory relevant to the current query.
+
+        This avoids loading every semantic memory item
+        individually through separate database calls.
         """
 
         memory = (
@@ -232,7 +319,7 @@ class PersonalAssistant:
 
             lines.append(
 
-                "\nPROFILE:"
+                "\nProfile:"
 
             )
 
@@ -248,37 +335,37 @@ class PersonalAssistant:
         # SEMANTIC MEMORY
         # -----------------------------------------------------
 
-        semantic = memory.get(
+        for category in [
 
-            "semantic",
+            "likes",
 
-            {}
+            "dislikes",
 
-        )
+            "interests"
 
-        if semantic:
+        ]:
 
-            lines.append(
+            values = memory.get(
 
-                "\nSEMANTIC MEMORY:"
+                category,
+
+                []
 
             )
 
-            for category, values in semantic.items():
+            if values:
 
-                if values:
+                lines.append(
+
+                    f"\n{category.capitalize()}:"
+
+                )
+
+                for value in values:
 
                     lines.append(
 
-                        f"- {category}: "
-
-                        + ", ".join(
-
-                            str(value)
-
-                            for value in values
-
-                        )
+                        f"- {value}"
 
                     )
 
@@ -298,7 +385,7 @@ class PersonalAssistant:
 
             lines.append(
 
-                "\nIMPORTANT EVENTS:"
+                "\nImportant Events:"
 
             )
 
@@ -306,91 +393,9 @@ class PersonalAssistant:
 
                 lines.append(
 
-                    "- "
-
-                    + str(
-
-                        event.get(
-
-                            "content",
-
-                            ""
-
-                        )
-
-                    )
+                    f"- {event.get('content', '')}"
 
                 )
-
-        # -----------------------------------------------------
-        # RELEVANT OLD CONVERSATIONS
-        # -----------------------------------------------------
-
-        conversations = memory.get(
-
-            "conversations",
-
-            []
-
-        )
-
-        if conversations:
-
-            lines.append(
-
-                "\nRELEVANT PREVIOUS CONVERSATIONS:"
-
-            )
-
-            for conversation in conversations:
-
-                lines.append(
-
-                    "\nPrevious User: "
-
-                    + str(
-
-                        conversation.get(
-
-                            "user",
-
-                            ""
-
-                        )
-
-                    )
-
-                )
-
-                lines.append(
-
-                    "Previous Assistant: "
-
-                    + str(
-
-                        conversation.get(
-
-                            "assistant",
-
-                            ""
-
-                        )
-
-                    )
-
-                )
-
-        # -----------------------------------------------------
-        # FALLBACK
-        # -----------------------------------------------------
-
-        if len(lines) == 1:
-
-            lines.append(
-
-                "\nNo relevant previous memory found."
-
-            )
 
         return "\n".join(
 
@@ -414,123 +419,13 @@ class PersonalAssistant:
 
             return
 
-        t = text.lower()
+        # Use the central memory learning system.
 
-        # -----------------------------------------------------
-        # NAME
-        # -----------------------------------------------------
+        self.memory.auto_learn(
 
-        if "my name is" in t:
+            text
 
-            name = (
-
-                text.split(
-
-                    "my name is",
-
-                    1
-
-                )[1].strip()
-
-            )
-
-            if name:
-
-                self.memory.set_profile(
-
-                    "name",
-
-                    name
-
-                )
-
-        # -----------------------------------------------------
-        # LIKES
-        # -----------------------------------------------------
-
-        if "i like" in t:
-
-            like = (
-
-                text.split(
-
-                    "i like",
-
-                    1
-
-                )[1].strip()
-
-            )
-
-            if like:
-
-                self.memory.add_semantic_memory(
-
-                    "likes",
-
-                    like
-
-                )
-
-        # -----------------------------------------------------
-        # DISLIKES
-        # -----------------------------------------------------
-
-        if "i hate" in t:
-
-            dislike = (
-
-                text.split(
-
-                    "i hate",
-
-                    1
-
-                )[1].strip()
-
-            )
-
-            if dislike:
-
-                self.memory.add_semantic_memory(
-
-                    "dislikes",
-
-                    dislike
-
-                )
-
-        # -----------------------------------------------------
-        # INTERESTS
-        # -----------------------------------------------------
-
-        for word in [
-
-            "ai",
-
-            "coding",
-
-            "anime",
-
-            "music",
-
-            "python",
-
-            "robot",
-
-            "robotics"
-
-        ]:
-
-            if word in t:
-
-                self.memory.add_semantic_memory(
-
-                    "interests",
-
-                    word
-
-                )
+        )
 
     # =========================================================
     # DIRECT TOOL EXECUTION
@@ -633,7 +528,7 @@ class PersonalAssistant:
         try:
 
             # =================================================
-            # VALIDATE
+            # VALIDATE INPUT
             # =================================================
 
             if not user_input:
@@ -662,7 +557,11 @@ class PersonalAssistant:
             # STATUS
             # =================================================
 
-            self.status = "PROCESSING"
+            self.status = (
+
+                "PROCESSING"
+
+            )
 
             # =================================================
             # 1. MEMORY CAPTURE
@@ -678,9 +577,13 @@ class PersonalAssistant:
             # 2. DIRECT TOOL EXECUTION
             # =================================================
 
-            tool_result = self._run_tools(
+            tool_result = (
 
-                user_input
+                self._run_tools(
+
+                    user_input
+
+                )
 
             )
 
@@ -692,7 +595,11 @@ class PersonalAssistant:
 
                 )
 
-                self.status = "READY"
+                self.status = (
+
+                    "READY"
+
+                )
 
                 return tool_result
 
@@ -700,15 +607,23 @@ class PersonalAssistant:
             # 3. AGENT LOOP
             # =================================================
 
-            agent_result = self._run_agent_loop(
+            agent_result = (
 
-                user_input
+                self._run_agent_loop(
+
+                    user_input
+
+                )
 
             )
 
             if agent_result:
 
-                self.status = "READY"
+                self.status = (
+
+                    "READY"
+
+                )
 
                 return agent_result
 
@@ -738,13 +653,23 @@ class PersonalAssistant:
 
                 )
 
-                self.status = "READY"
+                self.status = (
+
+                    "READY"
+
+                )
 
                 return response
 
             # =================================================
-            # 5. RETRIEVE RELEVANT MEMORY
+            # 5. RELEVANT MEMORY RETRIEVAL
             # =================================================
+
+            self.logger.info(
+
+                "Retrieving relevant memory..."
+
+            )
 
             memory_context = (
 
@@ -763,7 +688,7 @@ class PersonalAssistant:
             )
 
             # =================================================
-            # 6. BUILD CONVERSATION CONTEXT
+            # 6. CONVERSATION CONTEXT
             # =================================================
 
             context = (
@@ -771,6 +696,10 @@ class PersonalAssistant:
                 self.conversation.get_context()
 
             )
+
+            # =================================================
+            # 7. PERSONALITY CONTEXT
+            # =================================================
 
             personality_context = f"""
 
@@ -784,13 +713,21 @@ USER PERSONALITY:
 
     ', '.join(
 
-        self.personality_cache['interests']
+        self.personality_cache[
+
+            'interests'
+
+        ]
 
     )
 
 }
 
 """.strip()
+
+            # =================================================
+            # 8. ADD MEMORY TO CONTEXT
+            # =================================================
 
             context.insert(
 
@@ -821,7 +758,7 @@ USER PERSONALITY:
             )
 
             # =================================================
-            # 7. LLM RESPONSE
+            # 9. LLM FALLBACK
             # =================================================
 
             response = (
@@ -837,7 +774,7 @@ USER PERSONALITY:
             )
 
             # =================================================
-            # 8. SAVE EXCHANGE
+            # 10. SAVE EXCHANGE
             # =================================================
 
             self.conversation.add_exchange(
@@ -848,13 +785,21 @@ USER PERSONALITY:
 
             )
 
-            self.status = "READY"
+            self.status = (
+
+                "READY"
+
+            )
 
             return response
 
         except Exception as e:
 
-            self.status = "ERROR"
+            self.status = (
+
+                "ERROR"
+
+            )
 
             self.logger.error(
 
