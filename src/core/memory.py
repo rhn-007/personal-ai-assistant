@@ -1,44 +1,32 @@
 """
-Memory Management - Memory 5.0
+Memory Management - Memory 4.0
 
 Provides:
 
 - Conversation history
-- Intelligent conversation search
 - User profile memory
 - Semantic memory
 - Event memory
-- Automatic memory retrieval
+- Fast relevant memory retrieval
 """
 
 import sqlite3
 import json
-import re
 
 from datetime import datetime
-
 from pathlib import Path
-
 from typing import List, Dict, Optional
 
 from src.utils.logger import setup_logger
 
 
-logger = setup_logger(
-    __name__
-)
+logger = setup_logger(__name__)
 
 
 class MemoryManager:
 
     """
     Advanced persistent memory system.
-
-    Memory 5.0 adds:
-
-    - Keyword-based conversation retrieval
-    - Relevant conversation search
-    - Improved contextual memory
     """
 
     def __init__(
@@ -163,11 +151,39 @@ class MemoryManager:
 
             """)
 
+            # -------------------------------------------------
+            # INDEXES
+            # -------------------------------------------------
+
+            cursor.execute("""
+
+                CREATE INDEX IF NOT EXISTS idx_semantic_category
+
+                ON semantic_memory(category)
+
+            """)
+
+            cursor.execute("""
+
+                CREATE INDEX IF NOT EXISTS idx_events_importance
+
+                ON events(importance DESC)
+
+            """)
+
+            cursor.execute("""
+
+                CREATE INDEX IF NOT EXISTS idx_conversations_id
+
+                ON conversations(id DESC)
+
+            """)
+
             conn.commit()
 
             logger.info(
 
-                "Memory 5.0 database initialized."
+                "Memory database initialized."
 
             )
 
@@ -185,6 +201,10 @@ class MemoryManager:
 
     ):
 
+        if not key or not value:
+
+            return
+
         with sqlite3.connect(
 
             self.db_path
@@ -195,7 +215,15 @@ class MemoryManager:
 
                 INSERT INTO user_profile
 
-                (key, value, updated_at)
+                (
+
+                    key,
+
+                    value,
+
+                    updated_at
+
+                )
 
                 VALUES (?, ?, ?)
 
@@ -257,7 +285,11 @@ class MemoryManager:
 
                 """,
 
-                (key,)
+                (
+
+                    key,
+
+                )
 
             )
 
@@ -323,6 +355,16 @@ class MemoryManager:
 
     ):
 
+        if not category or not value:
+
+            return
+
+        value = value.strip()
+
+        if not value:
+
+            return
+
         with sqlite3.connect(
 
             self.db_path
@@ -365,7 +407,9 @@ class MemoryManager:
 
                     UPDATE semantic_memory
 
-                    SET weight = weight + 1,
+                    SET
+
+                        weight = weight + 1,
 
                         last_used = ?
 
@@ -457,6 +501,8 @@ class MemoryManager:
 
                 ORDER BY weight DESC
 
+                LIMIT 50
+
                 """,
 
                 (
@@ -528,6 +574,10 @@ class MemoryManager:
         importance: int = 1
 
     ):
+
+        if not content:
+
+            return
 
         with sqlite3.connect(
 
@@ -642,272 +692,7 @@ class MemoryManager:
             ]
 
     # =========================================================
-    # 🧠 INTELLIGENT CONVERSATION SEARCH
-    # =========================================================
-
-    def search_conversations(
-
-        self,
-
-        query: str,
-
-        limit: int = 5
-
-    ) -> List[Dict]:
-
-        """
-        Search old conversations for relevant messages.
-
-        Example:
-
-            Query:
-                "What was I working on with Spotify?"
-
-        Searches for important words such as:
-
-            working
-            spotify
-
-        Then ranks conversations based on
-        the number of matching words.
-        """
-
-        if not query:
-
-            return []
-
-        # -------------------------------------------------
-        # NORMALIZE QUERY
-        # -------------------------------------------------
-
-        query = query.lower()
-
-        words = re.findall(
-
-            r"\b[a-zA-Z0-9]+\b",
-
-            query
-
-        )
-
-        # -------------------------------------------------
-        # REMOVE COMMON WORDS
-        # -------------------------------------------------
-
-        stop_words = {
-
-            "what",
-
-            "was",
-
-            "were",
-
-            "is",
-
-            "are",
-
-            "am",
-
-            "i",
-
-            "me",
-
-            "my",
-
-            "we",
-
-            "you",
-
-            "the",
-
-            "a",
-
-            "an",
-
-            "and",
-
-            "or",
-
-            "to",
-
-            "of",
-
-            "in",
-
-            "on",
-
-            "for",
-
-            "with",
-
-            "about",
-
-            "did",
-
-            "do",
-
-            "have",
-
-            "has",
-
-            "had",
-
-            "just",
-
-            "talk",
-
-            "talking",
-
-            "tell",
-
-            "remember",
-
-            "recall"
-
-        }
-
-        keywords = [
-
-            word
-
-            for word in words
-
-            if word not in stop_words
-
-            and len(word) > 2
-
-        ]
-
-        if not keywords:
-
-            return []
-
-        # -------------------------------------------------
-        # SEARCH DATABASE
-        # -------------------------------------------------
-
-        with sqlite3.connect(
-
-            self.db_path
-
-        ) as conn:
-
-            cur = conn.cursor()
-
-            cur.execute(
-
-                """
-
-                SELECT
-
-                    id,
-
-                    timestamp,
-
-                    user_message,
-
-                    assistant_message
-
-                FROM conversations
-
-                ORDER BY id DESC
-
-                """
-
-            )
-
-            rows = cur.fetchall()
-
-        # -------------------------------------------------
-        # SCORE RESULTS
-        # -------------------------------------------------
-
-        matches = []
-
-        for row in rows:
-
-            conversation_id = row[0]
-
-            timestamp = row[1]
-
-            user_message = row[2] or ""
-
-            assistant_message = row[3] or ""
-
-            combined_text = (
-
-                user_message
-
-                + " "
-
-                + assistant_message
-
-            ).lower()
-
-            score = 0
-
-            matched_keywords = []
-
-            for keyword in keywords:
-
-                if keyword in combined_text:
-
-                    score += 1
-
-                    matched_keywords.append(
-
-                        keyword
-
-                    )
-
-            if score > 0:
-
-                matches.append({
-
-                    "id":
-
-                        conversation_id,
-
-                    "timestamp":
-
-                        timestamp,
-
-                    "user":
-
-                        user_message,
-
-                    "assistant":
-
-                        assistant_message,
-
-                    "score":
-
-                        score,
-
-                    "matched_keywords":
-
-                        matched_keywords
-
-                })
-
-        # -------------------------------------------------
-        # RANK RESULTS
-        # -------------------------------------------------
-
-        matches.sort(
-
-            key=lambda item:
-
-                item["score"],
-
-            reverse=True
-
-        )
-
-        return matches[:limit]
-
-    # =========================================================
-    # RETRIEVE RELEVANT MEMORY
+    # FAST RELEVANT MEMORY RETRIEVAL
     # =========================================================
 
     def retrieve_relevant_memory(
@@ -920,43 +705,226 @@ class MemoryManager:
 
         """
 
-        Retrieve all memory relevant
-        to the current query.
+        Retrieves memory relevant to the current query.
+
+        Uses a single SQLite connection to reduce overhead.
         """
 
-        conversations = (
+        if not text:
 
-            self.search_conversations(
+            return {
 
-                text,
+                "profile": {},
 
-                limit=5
+                "events": [],
+
+                "likes": [],
+
+                "dislikes": [],
+
+                "interests": []
+
+            }
+
+        text = text.lower()
+
+        # -------------------------------------------------
+        # EXTRACT SEARCH TERMS
+        # -------------------------------------------------
+
+        words = [
+
+            word.strip(
+
+                ".,!?;:()[]{}\"'"
+
+            )
+
+            for word in text.split()
+
+            if len(
+
+                word.strip(
+
+                    ".,!?;:()[]{}\"'"
+
+                )
+
+            ) > 2
+
+        ]
+
+        # Remove duplicates while preserving order
+
+        words = list(
+
+            dict.fromkeys(
+
+                words
 
             )
 
         )
 
+        with sqlite3.connect(
+
+            self.db_path
+
+        ) as conn:
+
+            cur = conn.cursor()
+
+            # -------------------------------------------------
+            # PROFILE
+            # -------------------------------------------------
+
+            cur.execute(
+
+                """
+
+                SELECT key, value
+
+                FROM user_profile
+
+                """
+
+            )
+
+            profile = dict(
+
+                cur.fetchall()
+
+            )
+
+            # -------------------------------------------------
+            # SEMANTIC MEMORY
+            # -------------------------------------------------
+
+            semantic = {
+
+                "likes": [],
+
+                "dislikes": [],
+
+                "interests": []
+
+            }
+
+            if words:
+
+                conditions = " OR ".join(
+
+                    [
+
+                        "LOWER(value) LIKE ?"
+
+                        for _ in words
+
+                    ]
+
+                )
+
+                search_values = [
+
+                    f"%{word}%"
+
+                    for word in words
+
+                ]
+
+                for category in semantic:
+
+                    cur.execute(
+
+                        f"""
+
+                        SELECT value
+
+                        FROM semantic_memory
+
+                        WHERE category = ?
+
+                        AND ({conditions})
+
+                        ORDER BY weight DESC
+
+                        LIMIT 5
+
+                        """,
+
+                        [
+
+                            category
+
+                        ] + search_values
+
+                    )
+
+                    semantic[category] = [
+
+                        row[0]
+
+                        for row in cur.fetchall()
+
+                    ]
+
+            # -------------------------------------------------
+            # EVENTS
+            # -------------------------------------------------
+
+            cur.execute(
+
+                """
+
+                SELECT
+
+                    type,
+
+                    content,
+
+                    importance,
+
+                    timestamp
+
+                FROM events
+
+                ORDER BY importance DESC, id DESC
+
+                LIMIT 5
+
+                """
+
+            )
+
+            events = [
+
+                {
+
+                    "type": row[0],
+
+                    "content": row[1],
+
+                    "importance": row[2],
+
+                    "timestamp": row[3]
+
+                }
+
+                for row in cur.fetchall()
+
+            ]
+
         return {
 
-            "profile":
+            "profile": profile,
 
-                self.get_all_profile(),
+            "events": events,
 
-            "semantic":
+            "likes": semantic["likes"],
 
-                self.get_all_semantic(),
+            "dislikes": semantic["dislikes"],
 
-            "events":
-
-                self.get_events(
-
-                    limit=5
-
-                ),
-
-            "conversations":
-
-                conversations
+            "interests": semantic["interests"]
 
         }
 
@@ -980,51 +948,63 @@ class MemoryManager:
 
         if "my name is" in t:
 
-            self.set_profile(
+            name = text.split(
 
-                "name",
+                "my name is",
 
-                text.split(
+                1
 
-                    "my name is",
+            )[1].strip()
 
-                    1
+            if name:
 
-                )[1].strip()
+                self.set_profile(
 
-            )
+                    "name",
+
+                    name
+
+                )
 
         if "i like" in t:
 
-            self.add_semantic_memory(
+            value = text.split(
 
-                "likes",
+                "i like",
 
-                text.split(
+                1
 
-                    "i like",
+            )[1].strip()
 
-                    1
+            if value:
 
-                )[1].strip()
+                self.add_semantic_memory(
 
-            )
+                    "likes",
+
+                    value
+
+                )
 
         if "i hate" in t:
 
-            self.add_semantic_memory(
+            value = text.split(
 
-                "dislikes",
+                "i hate",
 
-                text.split(
+                1
 
-                    "i hate",
+            )[1].strip()
 
-                    1
+            if value:
 
-                )[1].strip()
+                self.add_semantic_memory(
 
-            )
+                    "dislikes",
+
+                    value
+
+                )
 
         for word in [
 
@@ -1133,12 +1113,6 @@ class MemoryManager:
             )
 
             conn.commit()
-
-            logger.info(
-
-                "Conversation exchange saved."
-
-            )
 
     # =========================================================
     # GET CONVERSATION HISTORY
