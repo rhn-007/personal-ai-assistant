@@ -1,14 +1,18 @@
 """
 NEXUS Status Manager
 
-Stores and manages the current state of NEXUS.
+Central communication bridge between:
+- Assistant modules
+- Tools
+- Display system
+- Animation system
 
-This file does NOT:
-- display animations
-- print messages
+This file only stores the current NEXUS activity.
+
+It does NOT:
+- print anything
+- create animations
 - control the terminal
-
-It only keeps track of what NEXUS is currently doing.
 """
 
 
@@ -16,7 +20,7 @@ It only keeps track of what NEXUS is currently doing.
 # GLOBAL STATUS
 # =========================================================
 
-_current_status = "Idle"
+_current_status = None
 
 
 
@@ -28,12 +32,15 @@ def set_status(
     message: str
 ):
     """
-    Update the current NEXUS status.
+    Updates the current NEXUS activity.
 
     Example:
 
     set_status("Searching memory")
 
+    Animation displays:
+
+    [NEXUS] ○──○──◉ Searching memory...
     """
 
     global _current_status
@@ -41,7 +48,7 @@ def set_status(
 
     if not message:
 
-        _current_status = "Idle"
+        _current_status = None
 
         return
 
@@ -56,7 +63,7 @@ def set_status(
 
 def get_status():
     """
-    Returns the current NEXUS status.
+    Returns the current NEXUS activity.
 
     Example:
 
@@ -68,15 +75,30 @@ def get_status():
 
 
 # =========================================================
-# RESET STATUS
+# CLEAR STATUS
 # =========================================================
 
-def reset_status():
+def clear_status():
     """
-    Resets NEXUS status back to idle.
+    Removes the current activity.
+
+    Used when NEXUS finishes processing.
     """
 
     global _current_status
 
 
-    _current_status = "Idle"
+    _current_status = None
+
+
+
+# =========================================================
+# CHECK STATUS
+# =========================================================
+
+def is_active():
+    """
+    Returns True if NEXUS currently has an active task.
+    """
+
+    return _current_status is not None
