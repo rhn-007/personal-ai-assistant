@@ -3,8 +3,10 @@ NEXUS Display Manager
 
 Handles temporary animated status display.
 
-Animation is written to stderr so it does not
-conflict with application logs.
+Animation is temporary and disappears
+when the current task is completed.
+
+The animation does not remain frozen.
 """
 
 
@@ -17,6 +19,7 @@ from src.ui.status import get_status
 
 
 
+
 class NexusDisplay:
 
 
@@ -25,6 +28,8 @@ class NexusDisplay:
         self.running = False
 
         self.thread = None
+
+        self.current_line = False
 
         self.last_status = None
 
@@ -58,6 +63,32 @@ class NexusDisplay:
 
 
     # =====================================================
+    # CLEAR DISPLAY LINE
+    # =====================================================
+
+    def _clear_line(self):
+
+        """
+        Completely removes the animation line.
+        """
+
+
+        if self.current_line:
+
+            sys.stderr.write(
+
+                "\r" + (" " * 120) + "\r"
+
+            )
+
+            sys.stderr.flush()
+
+
+            self.current_line = False
+
+
+
+    # =====================================================
     # DISPLAY LOOP
     # =====================================================
 
@@ -86,50 +117,64 @@ class NexusDisplay:
 
 
 
-            if status:
+            # -------------------------------------------------
+            # No active task
+            # -------------------------------------------------
+
+            if not status:
 
 
-                frame = frames[index % len(frames)]
+                self._clear_line()
+
+                self.last_status = None
 
 
-                message = (
+                time.sleep(0.1)
 
-                    f"\r[NEXUS] {frame} {status}..."
-
-                )
-
-
-                sys.stderr.write(message)
-
-                sys.stderr.flush()
-
-
-                index += 1
+                continue
 
 
 
-            elif self.last_status:
+
+            # -------------------------------------------------
+            # Status changed
+            # -------------------------------------------------
+
+            if status != self.last_status:
 
 
-                # erase animation line
-
-                sys.stderr.write(
-
-                    "\r" + (" " * 100) + "\r"
-
-                )
-
-                sys.stderr.flush()
+                self._clear_line()
 
 
                 index = 0
 
 
 
+            frame = frames[index % len(frames)]
+
+
+            sys.stderr.write(
+
+                f"\r[NEXUS] {frame} {status}..."
+
+            )
+
+
+            sys.stderr.flush()
+
+
+
+            self.current_line = True
+
+
             self.last_status = status
 
 
+            index += 1
+
+
             time.sleep(0.25)
+
 
 
 
@@ -143,7 +188,9 @@ class NexusDisplay:
         self.running = False
 
 
+
         if self.thread:
+
 
             self.thread.join(
 
@@ -152,13 +199,9 @@ class NexusDisplay:
             )
 
 
-        sys.stderr.write(
 
-            "\r" + (" " * 100) + "\r"
+        self._clear_line()
 
-        )
-
-        sys.stderr.flush()
 
 
         self.thread = None
