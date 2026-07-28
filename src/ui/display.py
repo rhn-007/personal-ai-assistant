@@ -1,14 +1,20 @@
 """
-NEXUS Display Controller
+NEXUS Display Manager
 
-Handles the live status animation display.
+Handles temporary animated status display.
+
+The animation disappears automatically
+when status.py clears the status.
 """
 
 
 import threading
 import time
+import sys
+
 
 from src.ui.status import get_status
+
 
 
 
@@ -21,10 +27,12 @@ class NexusDisplay:
 
         self.thread = None
 
+        self.last_status = None
+
 
 
     # =====================================================
-    # START DISPLAY
+    # START
     # =====================================================
 
     def start(self):
@@ -39,7 +47,7 @@ class NexusDisplay:
 
         self.thread = threading.Thread(
 
-            target=self._display_loop,
+            target=self._loop,
 
             daemon=True
 
@@ -51,12 +59,24 @@ class NexusDisplay:
 
 
     # =====================================================
-    # DISPLAY LOOP
+    # ANIMATION LOOP
     # =====================================================
 
-    def _display_loop(self):
+    def _loop(self):
 
-        last_status = None
+        frames = [
+
+            "○──○──◉",
+
+            "○──◉──○",
+
+            "◉──○──○"
+
+        ]
+
+
+        index = 0
+
 
 
         while self.running:
@@ -65,28 +85,67 @@ class NexusDisplay:
             status = get_status()
 
 
-            if status and status != last_status:
+
+            if status:
 
 
-                print(
+                animation = frames[index % len(frames)]
 
-                    f"\n[NEXUS] ○──◉──○ {status}..."
+
+                text = (
+
+                    f"[NEXUS] {animation} {status}..."
 
                 )
 
 
-                last_status = status
+                sys.stdout.write(
 
+                    "\r" + text
+
+                )
+
+
+                sys.stdout.flush()
+
+
+
+                index += 1
+
+
+
+            else:
+
+
+                if self.last_status:
+
+
+                    sys.stdout.write(
+
+                        "\r" + (" " * 80) + "\r"
+
+                    )
+
+
+                    sys.stdout.flush()
+
+
+
+                index = 0
+
+
+
+            self.last_status = status
 
 
             time.sleep(
-                0.1
+                0.3
             )
 
 
 
     # =====================================================
-    # STOP DISPLAY
+    # STOP
     # =====================================================
 
     def stop(self):
@@ -96,11 +155,22 @@ class NexusDisplay:
 
         if self.thread:
 
+
             self.thread.join(
 
                 timeout=1
 
             )
+
+
+        sys.stdout.write(
+
+            "\r" + (" " * 80) + "\r"
+
+        )
+
+
+        sys.stdout.flush()
 
 
         self.thread = None
