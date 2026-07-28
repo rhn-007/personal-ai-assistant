@@ -1,198 +1,106 @@
 """
 NEXUS Display Controller
 
-Handles:
-- NEXUS loading animations
-- Temporary status display
-- Clearing animations after task completion
-
-This file only controls visual output.
-
-It reads status from:
-    src.ui.status
+Handles the live status animation display.
 """
 
 
-import sys
-import time
 import threading
+import time
 
-
-from src.ui.status import (
-    get_status,
-    is_active
-)
+from src.ui.status import get_status
 
 
 
-# =========================================================
-# ANIMATION FRAMES
-# =========================================================
+class NexusDisplay:
 
 
-FRAMES = [
+    def __init__(self):
 
-    "○──○──◉",
+        self.running = False
 
-    "○──◉──○",
-
-    "◉──○──○",
-
-    "○──◉──○"
-
-]
+        self.thread = None
 
 
 
-# =========================================================
-# DISPLAY SETTINGS
-# =========================================================
+    # =====================================================
+    # START DISPLAY
+    # =====================================================
+
+    def start(self):
+
+        if self.running:
+
+            return
 
 
-animation_running = False
+        self.running = True
 
 
+        self.thread = threading.Thread(
 
-# =========================================================
-# CLEAR CURRENT LINE
-# =========================================================
+            target=self._display_loop,
 
-
-def clear_line():
-
-    """
-    Removes the current NEXUS animation line.
-    """
-
-    sys.stdout.write(
-        "\r" + " " * 80 + "\r"
-    )
-
-    sys.stdout.flush()
-
-
-
-# =========================================================
-# DRAW ANIMATION
-# =========================================================
-
-
-def show_animation():
-
-    """
-    Runs the NEXUS animation.
-
-    Automatically disappears when
-    status.py clears the task.
-    """
-
-
-    global animation_running
-
-
-    animation_running = True
-
-
-    index = 0
-
-
-    while animation_running:
-
-
-        status = get_status()
-
-
-        if not status:
-
-            break
-
-
-
-        frame = FRAMES[index]
-
-
-
-        sys.stdout.write(
-
-            f"\r[NEXUS] {frame} {status}..."
+            daemon=True
 
         )
 
 
-        sys.stdout.flush()
+        self.thread.start()
 
 
 
-        index = (
+    # =====================================================
+    # DISPLAY LOOP
+    # =====================================================
 
-            index + 1
+    def _display_loop(self):
 
-        ) % len(FRAMES)
-
-
-
-        time.sleep(0.25)
+        last_status = None
 
 
-
-    clear_line()
-
-
-    animation_running = False
+        while self.running:
 
 
+            status = get_status()
 
 
-
-# =========================================================
-# START DISPLAY THREAD
-# =========================================================
+            if status and status != last_status:
 
 
-def start_display():
+                print(
 
-    """
-    Starts the NEXUS display monitor.
+                    f"\n[NEXUS] ○──◉──○ {status}..."
 
-    This runs separately from the assistant.
-    """
+                )
 
 
-    thread = threading.Thread(
-
-        target=show_animation,
-
-        daemon=True
-
-    )
-
-
-    thread.start()
+                last_status = status
 
 
 
-    return thread
+            time.sleep(
+                0.1
+            )
 
 
 
+    # =====================================================
+    # STOP DISPLAY
+    # =====================================================
+
+    def stop(self):
+
+        self.running = False
 
 
-# =========================================================
-# STOP DISPLAY
-# =========================================================
+        if self.thread:
+
+            self.thread.join(
+
+                timeout=1
+
+            )
 
 
-def stop_display():
-
-    """
-    Force stop animation.
-    """
-
-
-    global animation_running
-
-
-    animation_running = False
-
-
-    clear_line()
+        self.thread = None
