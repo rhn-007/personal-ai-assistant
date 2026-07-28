@@ -16,11 +16,10 @@ import typer
 load_dotenv()
 
 
+
 from src.core.assistant import PersonalAssistant
 
 from src.utils.logger import setup_logger
-
-from src.ui.status import clear_status
 
 from src.ui.display import NexusDisplay
 
@@ -79,7 +78,47 @@ def init_assistant():
             sys.exit(1)
 
 
+
     return assistant
+
+
+
+
+# =========================================================
+# CLEAN USER INPUT
+# =========================================================
+
+
+def clean_user_input(text):
+
+    """
+    Removes accidental prompt duplication.
+
+    Example:
+
+    You: hello
+
+    becomes:
+
+    hello
+    """
+
+
+    if not text:
+
+        return text
+
+
+    text = text.strip()
+
+
+    if text.lower().startswith("you:"):
+
+        text = text[4:].strip()
+
+
+    return text
+
 
 
 
@@ -97,13 +136,17 @@ def chat():
     bot = init_assistant()
 
 
+
     display.start()
 
 
 
     print(
+
         "\n🤖 NEXUS Ready "
+
         "(type 'help' for commands)\n"
+
     )
 
 
@@ -115,8 +158,18 @@ def chat():
 
 
             user_input = input(
+
                 "You: "
-            ).strip()
+
+            )
+
+
+
+            user_input = clean_user_input(
+
+                user_input
+
+            )
 
 
 
@@ -144,13 +197,13 @@ def chat():
             ]:
 
 
-                clear_status()
-
                 display.stop()
 
 
                 print(
+
                     "Goodbye 👋"
+
                 )
 
 
@@ -175,6 +228,7 @@ def chat():
 
 
 
+
             # ---------------------------------------------
             # PROCESS REQUEST
             # ---------------------------------------------
@@ -185,13 +239,6 @@ def chat():
                 user_input
 
             )
-
-
-            # IMPORTANT:
-            # Remove any leftover animation
-            # before displaying final answer
-
-            clear_status()
 
 
 
@@ -207,13 +254,14 @@ def chat():
         except KeyboardInterrupt:
 
 
-            clear_status()
 
             display.stop()
 
 
             print(
+
                 "\nGoodbye 👋"
+
             )
 
 
@@ -225,8 +273,6 @@ def chat():
 
         except Exception as e:
 
-
-            clear_status()
 
 
             logger.error(
@@ -273,14 +319,19 @@ def ask(
 
 
 
-        response = bot.process_input(
+        question = clean_user_input(
 
             question
 
         )
 
 
-        clear_status()
+
+        response = bot.process_input(
+
+            question
+
+        )
 
 
 
@@ -294,9 +345,6 @@ def ask(
 
     except Exception as e:
 
-
-
-        clear_status()
 
 
         logger.error(
