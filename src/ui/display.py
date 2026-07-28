@@ -1,162 +1,115 @@
 """
-NEXUS Display System
+NEXUS Display Controller
 
-Temporary terminal HUD.
+Handles:
+- NEXUS loading animations
+- Temporary status display
+- Clearing animations after task completion
 
-The animation is NOT a log.
-It exists only while NEXUS is performing a task.
+This file only controls visual output.
 
-Flow:
-
-status.py
-    ↓
-display.py
-    ↓
-temporary animation
-    ↓
-clear when finished
+It reads status from:
+    src.ui.status
 """
 
 
 import sys
-import threading
 import time
+import threading
 
 
-from src.ui.status import get_status
+from src.ui.status import (
+    get_status,
+    is_active
+)
 
 
 
-class NexusDisplay:
+# =========================================================
+# ANIMATION FRAMES
+# =========================================================
 
 
-    def __init__(self):
+FRAMES = [
 
-        self.running = False
+    "○──○──◉",
 
-        self.thread = None
+    "○──◉──○",
 
-        self.current_status = None
+    "◉──○──○",
 
+    "○──◉──○"
 
-        self.frames = [
+]
 
-            "○──○──◉",
 
-            "○──◉──○",
 
-            "◉──○──○",
+# =========================================================
+# DISPLAY SETTINGS
+# =========================================================
 
-            "○──◉──○"
 
-        ]
+animation_running = False
 
 
-        self.frame_index = 0
 
+# =========================================================
+# CLEAR CURRENT LINE
+# =========================================================
 
 
-    # =====================================================
-    # START DISPLAY
-    # =====================================================
+def clear_line():
 
+    """
+    Removes the current NEXUS animation line.
+    """
 
-    def start(self):
+    sys.stdout.write(
+        "\r" + " " * 80 + "\r"
+    )
 
-        if self.running:
+    sys.stdout.flush()
 
-            return
 
 
-        self.running = True
+# =========================================================
+# DRAW ANIMATION
+# =========================================================
 
 
-        self.thread = threading.Thread(
+def show_animation():
 
-            target=self._display_loop,
+    """
+    Runs the NEXUS animation.
 
-            daemon=True
+    Automatically disappears when
+    status.py clears the task.
+    """
 
-        )
 
+    global animation_running
 
-        self.thread.start()
 
+    animation_running = True
 
 
-    # =====================================================
-    # DISPLAY LOOP
-    # =====================================================
+    index = 0
 
 
-    def _display_loop(self):
+    while animation_running:
 
 
-        while self.running:
+        status = get_status()
 
 
-            status = get_status()
+        if not status:
 
+            break
 
 
-            # -------------------------------------------------
-            # STATUS ACTIVE
-            # -------------------------------------------------
 
-            if status:
+        frame = FRAMES[index]
 
-
-                if status != self.current_status:
-
-
-                    self.clear()
-
-
-                    self.current_status = status
-
-
-
-                self.draw(status)
-
-
-
-            # -------------------------------------------------
-            # NO STATUS
-            # -------------------------------------------------
-
-            else:
-
-
-                if self.current_status:
-
-
-                    self.clear()
-
-
-                    self.current_status = None
-
-
-
-            time.sleep(0.25)
-
-
-
-    # =====================================================
-    # DRAW ANIMATION
-    # =====================================================
-
-
-    def draw(
-        self,
-        status
-    ):
-
-
-        frame = self.frames[
-
-            self.frame_index
-
-        ]
 
 
         sys.stdout.write(
@@ -170,50 +123,76 @@ class NexusDisplay:
 
 
 
-        self.frame_index = (
+        index = (
 
-            self.frame_index + 1
+            index + 1
 
-        ) % len(self.frames)
-
-
-
-    # =====================================================
-    # CLEAR CURRENT ANIMATION
-    # =====================================================
-
-
-    def clear(self):
-
-
-        sys.stdout.write(
-
-            "\r" + " " * 80 + "\r"
-
-        )
-
-
-        sys.stdout.flush()
+        ) % len(FRAMES)
 
 
 
-    # =====================================================
-    # STOP
-    # =====================================================
+        time.sleep(0.25)
 
 
-    def stop(self):
+
+    clear_line()
 
 
-        self.running = False
+    animation_running = False
 
 
-        self.clear()
 
 
-        if self.thread:
+
+# =========================================================
+# START DISPLAY THREAD
+# =========================================================
 
 
-            self.thread.join(
-                timeout=1
-            )
+def start_display():
+
+    """
+    Starts the NEXUS display monitor.
+
+    This runs separately from the assistant.
+    """
+
+
+    thread = threading.Thread(
+
+        target=show_animation,
+
+        daemon=True
+
+    )
+
+
+    thread.start()
+
+
+
+    return thread
+
+
+
+
+
+# =========================================================
+# STOP DISPLAY
+# =========================================================
+
+
+def stop_display():
+
+    """
+    Force stop animation.
+    """
+
+
+    global animation_running
+
+
+    animation_running = False
+
+
+    clear_line()
