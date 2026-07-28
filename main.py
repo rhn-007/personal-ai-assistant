@@ -94,7 +94,7 @@ def chat():
 
 
     print(
-        "\n🤖 NEXUS Ready (type 'help' for commands)\n"
+        "\n🤖 N.E.X.U.S [Neural EXecutive Utility System] Ready (type 'help' for commands)\n"
     )
 
 
