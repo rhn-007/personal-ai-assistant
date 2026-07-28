@@ -16,6 +16,7 @@ load_dotenv()
 
 from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
+from src.ui.display import NexusDisplay
 
 
 logger = setup_logger(__name__)
@@ -24,6 +25,9 @@ logger = setup_logger(__name__)
 app = typer.Typer()
 
 assistant = None
+
+display = NexusDisplay()
+
 
 
 # =========================================================
@@ -59,16 +63,14 @@ def init_assistant():
     return assistant
 
 
+
 # =========================================================
 # CHAT MODE
 # =========================================================
 
 @app.command()
-def chat():
 
-    """
-    Interactive chat mode
-    """
+def chat():
 
     bot = init_assistant()
 
@@ -96,6 +98,7 @@ def chat():
             command = user_input.lower()
 
 
+
             # -------------------------------------------------
             # EXIT
             # -------------------------------------------------
@@ -103,6 +106,7 @@ def chat():
             if command in [
 
                 "quit",
+
                 "exit"
 
             ]:
@@ -112,6 +116,7 @@ def chat():
                 )
 
                 break
+
 
 
             # -------------------------------------------------
@@ -125,24 +130,33 @@ def chat():
                 continue
 
 
+
             # -------------------------------------------------
-            # PROCESS REQUEST
+            # NEXUS PROCESSING
             # -------------------------------------------------
 
-            response = (
+            display.start_processing(
+                "Processing..."
+            )
 
-                bot.process_input(
 
+            try:
+
+                response = bot.process_input(
                     user_input
-
                 )
 
-            )
+
+            finally:
+
+                display.stop_processing()
+
 
 
             print(
-                f"\nNEXUS: {response}\n"
+                f"\nAssistant: {response}\n"
             )
+
 
 
         except KeyboardInterrupt:
@@ -152,6 +166,7 @@ def chat():
             )
 
             break
+
 
 
         except Exception as e:
@@ -165,33 +180,38 @@ def chat():
             )
 
 
+
 # =========================================================
 # ASK MODE
 # =========================================================
 
 @app.command()
+
 def ask(
     question: str
 ):
-
-    """
-    Single question mode
-    """
 
     bot = init_assistant()
 
 
     try:
 
-        response = (
+        display.start_processing(
+            "Processing..."
+        )
 
-            bot.process_input(
 
+        try:
+
+            response = bot.process_input(
                 question
-
             )
 
-        )
+
+        finally:
+
+            display.stop_processing()
+
 
 
         print(
@@ -205,10 +225,10 @@ def ask(
             f"Ask error: {e}"
         )
 
-
         print(
             f"❌ Error: {e}"
         )
+
 
 
 # =========================================================
@@ -216,11 +236,13 @@ def ask(
 # =========================================================
 
 @app.command()
+
 def version():
 
     print(
         "NEXUS AI Assistant v1.0.0"
     )
+
 
 
 # =========================================================
@@ -247,8 +269,10 @@ def print_help():
 
 - quit
     → Exit chat mode
+
 """
     )
+
 
 
 # =========================================================
