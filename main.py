@@ -7,7 +7,7 @@ NEXUS
 
 
 import sys
-
+import time
 
 from dotenv import load_dotenv
 import typer
@@ -132,161 +132,117 @@ def clean_user_input(text):
 
 def chat():
 
-
-    bot = init_assistant()
-
-
-
-    display.start()
-
-
-
-    print(
-
-        "\n🤖 NEXUS Ready "
-
-        "(type 'help' for commands)\n"
-
-    )
-
-
-
-    while True:
-
-
-        try:
-
-
-            user_input = input(
-
-                "You: "
-
-            )
-
-
-
-            user_input = clean_user_input(
-
-                user_input
-
-            )
-
-
-
-            if not user_input:
-
-                continue
-
-
-
-            command = user_input.lower()
-
-
-
-            # ---------------------------------------------
-            # EXIT
-            # ---------------------------------------------
-
-
-            if command in [
-
-                "quit",
-
-                "exit"
-
-            ]:
-
-
-                display.stop()
-
-
+    @app.command()
+    def chat():
+    
+        bot = init_assistant()
+    
+        display.start()
+    
+        print(
+            "\n🤖 NEXUS Ready (type 'help' for commands)\n"
+        )
+    
+    
+        while True:
+    
+            try:
+    
+                user_input = input(
+                    "You: "
+                ).strip()
+    
+    
+                if not user_input:
+    
+                    continue
+    
+    
+                command = user_input.lower()
+    
+    
+                # EXIT
+    
+                if command in [
+                    "quit",
+                    "exit"
+                ]:
+    
+                    display.stop()
+    
+                    print(
+                        "Goodbye 👋"
+                    )
+    
+                    break
+    
+    
+    
+                # HELP
+    
+                if command == "help":
+    
+                    print_help()
+    
+                    continue
+    
+    
+    
+                # PROCESS
+    
+                response = bot.process_input(
+                    user_input
+                )
+    
+    
+                # IMPORTANT:
+                # remove any leftover animation line
+    
+                clear_status()
+    
+    
                 print(
-
-                    "Goodbye 👋"
-
+                    "\nNEXUS:",
+                    response,
+                    "\n"
+                )
+    
+    
+                # small delay allows terminal refresh
+    
+                time.sleep(0.05)
+    
+    
+    
+            except KeyboardInterrupt:
+    
+    
+                display.stop()
+    
+    
+                print(
+                    "\nGoodbye 👋"
+                )
+    
+    
+                break
+    
+    
+    
+            except Exception as e:
+    
+    
+                logger.error(
+                    f"Chat error: {e}"
+                )
+    
+    
+                print(
+                    f"❌ Error: {e}"
                 )
 
 
-                break
-
-
-
-
-            # ---------------------------------------------
-            # HELP
-            # ---------------------------------------------
-
-
-            if command == "help":
-
-
-                print_help()
-
-
-                continue
-
-
-
-
-
-            # ---------------------------------------------
-            # PROCESS REQUEST
-            # ---------------------------------------------
-
-
-            response = bot.process_input(
-
-                user_input
-
-            )
-
-
-
-            print(
-
-                f"\nNEXUS: {response}\n"
-
-            )
-
-
-
-
-        except KeyboardInterrupt:
-
-
-
-            display.stop()
-
-
-            print(
-
-                "\nGoodbye 👋"
-
-            )
-
-
-            break
-
-
-
-
-
-        except Exception as e:
-
-
-
-            logger.error(
-
-                f"Chat error: {e}"
-
-            )
-
-
-            print(
-
-                f"❌ Error: {e}"
-
-            )
+   
 
 
 
