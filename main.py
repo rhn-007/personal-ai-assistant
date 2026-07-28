@@ -11,14 +11,13 @@ import time
 from dotenv import load_dotenv
 import typer
 
-load_dotenv()
-
-
 from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
-
 from src.ui.display import NexusDisplay
 from src.ui.status import clear_status
+
+
+load_dotenv()
 
 
 logger = setup_logger(__name__)
@@ -29,14 +28,9 @@ app = typer.Typer()
 
 assistant = None
 
-
 display = NexusDisplay()
 
 
-
-# =========================================================
-# INITIALIZE ASSISTANT
-# =========================================================
 
 def init_assistant():
 
@@ -70,21 +64,19 @@ def init_assistant():
 
 
 
-# =========================================================
-# CLEAN INPUT
-# =========================================================
-
 def clean_user_input(text):
 
     if not text:
 
-        return text
+        return ""
 
 
     text = text.strip()
 
 
-    if text.lower().startswith("you:"):
+    if text.lower().startswith(
+        "you:"
+    ):
 
         text = text[4:].strip()
 
@@ -93,15 +85,10 @@ def clean_user_input(text):
 
 
 
-# =========================================================
-# CHAT MODE
-# =========================================================
-
 @app.command()
 def chat():
 
     bot = init_assistant()
-
 
     display.start()
 
@@ -111,18 +98,13 @@ def chat():
     )
 
 
-    while True:
+    try:
 
-        try:
+        while True:
 
             user_input = input(
                 "You: "
-            ).strip()
-
-
-            if not user_input:
-
-                continue
+            )
 
 
             user_input = clean_user_input(
@@ -130,17 +112,24 @@ def chat():
             )
 
 
+            if not user_input:
+
+                continue
+
+
+            logger.info(
+                f"User input: {user_input}"
+            )
+
+
             command = user_input.lower()
 
 
-            # EXIT
 
             if command in [
                 "quit",
                 "exit"
             ]:
-
-                display.stop()
 
                 print(
                     "Goodbye 👋"
@@ -150,8 +139,6 @@ def chat():
 
 
 
-            # HELP
-
             if command == "help":
 
                 print_help()
@@ -160,14 +147,10 @@ def chat():
 
 
 
-            # PROCESS REQUEST
-
             response = bot.process_input(
                 user_input
             )
 
-
-            # Remove animation
 
             clear_status()
 
@@ -181,37 +164,29 @@ def chat():
 
 
 
-        except KeyboardInterrupt:
+    except KeyboardInterrupt:
+
+        print(
+            "\nGoodbye 👋"
+        )
 
 
-            display.stop()
+    except Exception as e:
+
+        logger.error(
+            f"Chat error: {e}"
+        )
+
+        print(
+            f"❌ Error: {e}"
+        )
 
 
-            print(
-                "\nGoodbye 👋"
-            )
+    finally:
 
-            break
+        display.stop()
 
 
-
-        except Exception as e:
-
-
-            logger.error(
-                f"Chat error: {e}"
-            )
-
-
-            print(
-                f"❌ Error: {e}"
-            )
-
-
-
-# =========================================================
-# ASK MODE
-# =========================================================
 
 @app.command()
 def ask(
@@ -220,7 +195,6 @@ def ask(
 
     bot = init_assistant()
 
-
     display.start()
 
 
@@ -228,6 +202,20 @@ def ask(
 
         question = clean_user_input(
             question
+        )
+
+
+        if not question:
+
+            print(
+                "Please enter a question."
+            )
+
+            return
+
+
+        logger.info(
+            f"User input: {question}"
         )
 
 
@@ -244,9 +232,7 @@ def ask(
         )
 
 
-
     except Exception as e:
-
 
         logger.error(
             f"Ask error: {e}"
@@ -264,10 +250,6 @@ def ask(
 
 
 
-# =========================================================
-# VERSION
-# =========================================================
-
 @app.command()
 def version():
 
@@ -276,10 +258,6 @@ def version():
     )
 
 
-
-# =========================================================
-# HELP
-# =========================================================
 
 def print_help():
 
@@ -306,10 +284,6 @@ quit
     )
 
 
-
-# =========================================================
-# ENTRY POINT
-# =========================================================
 
 if __name__ == "__main__":
 
