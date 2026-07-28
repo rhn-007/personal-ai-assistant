@@ -806,6 +806,29 @@ class PersonalAssistant:
 
             )
 
+            def _needs_memory(self, text):
+
+                memory_keywords = [
+            
+                    "remember",
+                    "recall",
+                    "previous",
+                    "last conversation",
+                    "what do you know about me",
+                    "my interests",
+                    "my name",
+                    "what did i tell you",
+                    "do you know me"
+            
+                ]
+            
+                text = text.lower()
+            
+                return any(
+                    keyword in text
+                    for keyword in memory_keywords
+                )
+
 
 
             # =================================================
@@ -900,11 +923,17 @@ class PersonalAssistant:
 
 
 
-            memory_context = self._get_memory_context(
+           if self._needs_memory(user_input):
 
-                user_input
-
-            )
+                memory_context = self._get_memory_context(
+                    user_input
+                )
+            
+            else:
+            
+                memory_context = (
+                    "No memory retrieval required."
+                )
 
 
 
