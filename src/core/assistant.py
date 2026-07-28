@@ -27,6 +27,8 @@ from dotenv import load_dotenv
 
 from src.core.conversation import ConversationManager
 
+from src.ui.status import set_status, clear_status
+
 from src.core.memory import MemoryManager
 
 from src.integrations.ollama import OllamaIntegration
@@ -481,6 +483,8 @@ class PersonalAssistant:
 
         try:
 
+            set_status("Running tools")
+
             tool_result = (
 
                 self.tool_manager.execute(
@@ -523,6 +527,8 @@ class PersonalAssistant:
     ):
 
         try:
+
+            set_status("Planning task")
 
             if not self.agent_loop:
 
@@ -657,6 +663,8 @@ class PersonalAssistant:
             # 5. MEMORY + OLLAMA
             # =================================================
 
+            set_status("Searching memory")
+            
             self.logger.info(
                 "Retrieving relevant memory..."
             )
@@ -741,6 +749,8 @@ Interests:
             # 9. GENERATE RESPONSE
             # =================================================
 
+            set_status("Thinking")
+            
             response = (
 
                 self.llm.generate_response(
@@ -767,6 +777,8 @@ Interests:
 
             self.status = "READY"
 
+            clear_status()
+
             return response
 
         except Exception as e:
@@ -776,6 +788,8 @@ Interests:
             self.logger.error(
                 f"Processing error: {e}"
             )
+
+            clear_status()
 
             return (
                 f"Error: {str(e)}"
