@@ -279,32 +279,34 @@ class PersonalAssistant:
             "Retrieving memory from database..."
         )
 
-        memory_keywords = [
+        def _needs_memory(self, text):
 
-            "remember",
-            "recall",
-            "previous",
-            "before",
-            "past",
-            "conversation",
-            "my name",
-            "my interests"
-        ]
+            memory_keywords = [
         
+                "remember",
+                "recall",
+                "previous",
+                "last conversation",
+                "what do you know about me",
+                "my interests",
+                "my name",
+                "what did i tell you",
+                "do you know me"
         
-        if not any(
-            word in query.lower()
-            for word in memory_keywords
-        ):
+            ]
         
-            return "No relevant memory required."
-
+            text = text.lower()
+        
+            return any(
+                keyword in text
+                for keyword in memory_keywords
+            )
 
         memory_snapshot = (
 
             self.memory.get_memory_snapshot(
 
-                conversation_limit=10
+                conversation_limit=15
 
             )
 
