@@ -30,7 +30,7 @@ class OllamaIntegration:
 
         self.system_prompt = """
 
-You are JARVIS, a highly intelligent personal AI assistant.
+You are NEXUS, a highly intelligent personal AI assistant.
 
 You run locally through Ollama.
 
