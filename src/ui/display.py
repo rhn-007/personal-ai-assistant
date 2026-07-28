@@ -1,14 +1,13 @@
 """
 NEXUS Display System
 
-Handles:
-- Processing animations
-- Status messages
-- Future UI elements
+Controls:
+- Terminal animation
+- Status monitoring
+- Automatic start/stop behaviour
 
-Keeps display logic separate from:
-- main.py
-- assistant.py
+This file connects:
+status.py  →  animation display
 """
 
 
@@ -17,13 +16,16 @@ import threading
 import time
 
 
-# =========================================================
-# NEXUS PROCESSING ANIMATION
-# =========================================================
+from src.ui.status import (
+    get_status,
+    is_active
+)
+
+
 
 class NexusDisplay:
     """
-    Controls NEXUS terminal display.
+    Main NEXUS terminal display controller.
     """
 
 
@@ -47,35 +49,29 @@ class NexusDisplay:
         ]
 
 
-        self.current_index = 0
+        self.frame_index = 0
 
 
 
     # =====================================================
-    # START PROCESSING DISPLAY
+    # START DISPLAY MONITOR
     # =====================================================
 
-    def start_processing(
-        self,
-        message="Processing..."
-    ):
-
+    def start(self):
         """
-        Starts the NEXUS loading animation.
+        Starts monitoring the NEXUS status.
 
-        Example:
-
-        [NEXUS] ○──○──◉ Processing...
+        Animation only appears when
+        status.py contains an active status.
         """
+
 
         self.stop_event.clear()
 
 
         self.animation_thread = threading.Thread(
 
-            target=self._animate,
-
-            args=(message,),
+            target=self._monitor_status,
 
             daemon=True
 
@@ -87,39 +83,18 @@ class NexusDisplay:
 
 
     # =====================================================
-    # ANIMATION LOOP
+    # STATUS MONITOR
     # =====================================================
 
-    def _animate(
-        self,
-        message
-    ):
+    def _monitor_status(self):
 
 
         while not self.stop_event.is_set():
 
 
-            frame = self.frames[
-                self.current_index
-            ]
+            if is_active():
 
-
-            sys.stdout.write(
-
-                f"\r[NEXUS] {frame} {message}"
-
-            )
-
-
-            sys.stdout.flush()
-
-
-            self.current_index = (
-
-                self.current_index + 1
-
-            ) % len(self.frames)
-
+                self._draw_animation()
 
 
             time.sleep(
@@ -129,14 +104,71 @@ class NexusDisplay:
 
 
     # =====================================================
-    # STOP PROCESSING DISPLAY
+    # DRAW ANIMATION
     # =====================================================
 
-    def stop_processing(self):
+    def _draw_animation(self):
 
+
+        status = get_status()
+
+
+        if not status:
+
+            return
+
+
+        frame = self.frames[
+
+            self.frame_index
+
+        ]
+
+
+        sys.stdout.write(
+
+            f"\r[NEXUS] {frame} {status}..."
+
+        )
+
+
+        sys.stdout.flush()
+
+
+        self.frame_index = (
+
+            self.frame_index + 1
+
+        ) % len(self.frames)
+
+
+
+    # =====================================================
+    # CLEAR DISPLAY
+    # =====================================================
+
+    def clear(self):
         """
-        Removes animation when response is ready.
+        Removes animation from terminal.
         """
+
+
+        sys.stdout.write(
+
+            "\r" + " " * 80 + "\r"
+
+        )
+
+
+        sys.stdout.flush()
+
+
+
+    # =====================================================
+    # STOP DISPLAY
+    # =====================================================
+
+    def stop(self):
 
 
         self.stop_event.set()
@@ -148,38 +180,4 @@ class NexusDisplay:
 
 
 
-        # Clear animation line
-
-        sys.stdout.write(
-
-            "\r" + " " * 60 + "\r"
-
-        )
-
-
-        sys.stdout.flush()
-
-
-
-    # =====================================================
-    # STATIC STATUS MESSAGE
-    # =====================================================
-
-    @staticmethod
-    def status(
-        message
-    ):
-
-        """
-        Display normal NEXUS status messages.
-
-        Example:
-
-        [NEXUS] Searching memory...
-        """
-
-        print(
-
-            f"[NEXUS] {message}"
-
-        )
+        self.clear()
