@@ -5,36 +5,29 @@ Personal AI Assistant - Main Entry Point
 NEXUS
 """
 
-
 import sys
 import time
 
 from dotenv import load_dotenv
 import typer
 
-
 load_dotenv()
 
 
-
 from src.core.assistant import PersonalAssistant
-
 from src.utils.logger import setup_logger
 
 from src.ui.display import NexusDisplay
-
+from src.ui.status import clear_status
 
 
 logger = setup_logger(__name__)
 
 
-
 app = typer.Typer()
 
 
-
 assistant = None
-
 
 
 display = NexusDisplay()
@@ -45,11 +38,9 @@ display = NexusDisplay()
 # INITIALIZE ASSISTANT
 # =========================================================
 
-
 def init_assistant():
 
     global assistant
-
 
     if assistant is None:
 
@@ -58,7 +49,6 @@ def init_assistant():
             logger.info(
                 "Initializing Personal AI Assistant..."
             )
-
 
             assistant = PersonalAssistant()
 
@@ -69,40 +59,22 @@ def init_assistant():
                 f"Failed to initialize assistant: {e}"
             )
 
-
             print(
                 f"❌ Initialization error: {e}"
             )
 
-
             sys.exit(1)
-
 
 
     return assistant
 
 
 
-
 # =========================================================
-# CLEAN USER INPUT
+# CLEAN INPUT
 # =========================================================
-
 
 def clean_user_input(text):
-
-    """
-    Removes accidental prompt duplication.
-
-    Example:
-
-    You: hello
-
-    becomes:
-
-    hello
-    """
-
 
     if not text:
 
@@ -121,131 +93,119 @@ def clean_user_input(text):
 
 
 
-
-
 # =========================================================
 # CHAT MODE
 # =========================================================
 
-
 @app.command()
-
 def chat():
 
-    @app.command()
-    def chat():
-    
-        bot = init_assistant()
-    
-        display.start()
-    
-        print(
-            "\n🤖 NEXUS Ready (type 'help' for commands)\n"
-        )
-    
-    
-        while True:
-    
-            try:
-    
-                user_input = input(
-                    "You: "
-                ).strip()
-    
-    
-                if not user_input:
-    
-                    continue
-    
-    
-                command = user_input.lower()
-    
-    
-                # EXIT
-    
-                if command in [
-                    "quit",
-                    "exit"
-                ]:
-    
-                    display.stop()
-    
-                    print(
-                        "Goodbye 👋"
-                    )
-    
-                    break
-    
-    
-    
-                # HELP
-    
-                if command == "help":
-    
-                    print_help()
-    
-                    continue
-    
-    
-    
-                # PROCESS
-    
-                response = bot.process_input(
-                    user_input
-                )
-    
-    
-                # IMPORTANT:
-                # remove any leftover animation line
-    
-                clear_status()
-    
-    
-                print(
-                    "\nNEXUS:",
-                    response,
-                    "\n"
-                )
-    
-    
-                # small delay allows terminal refresh
-    
-                time.sleep(0.05)
-    
-    
-    
-            except KeyboardInterrupt:
-    
-    
+    bot = init_assistant()
+
+
+    display.start()
+
+
+    print(
+        "\n🤖 NEXUS Ready (type 'help' for commands)\n"
+    )
+
+
+    while True:
+
+        try:
+
+            user_input = input(
+                "You: "
+            ).strip()
+
+
+            if not user_input:
+
+                continue
+
+
+            user_input = clean_user_input(
+                user_input
+            )
+
+
+            command = user_input.lower()
+
+
+            # EXIT
+
+            if command in [
+                "quit",
+                "exit"
+            ]:
+
                 display.stop()
-    
-    
+
                 print(
-                    "\nGoodbye 👋"
+                    "Goodbye 👋"
                 )
-    
-    
+
                 break
-    
-    
-    
-            except Exception as e:
-    
-    
-                logger.error(
-                    f"Chat error: {e}"
-                )
-    
-    
-                print(
-                    f"❌ Error: {e}"
-                )
-
-
-   
 
 
 
+            # HELP
+
+            if command == "help":
+
+                print_help()
+
+                continue
+
+
+
+            # PROCESS REQUEST
+
+            response = bot.process_input(
+                user_input
+            )
+
+
+            # Remove animation
+
+            clear_status()
+
+
+            print(
+                f"\nNEXUS: {response}\n"
+            )
+
+
+            time.sleep(0.05)
+
+
+
+        except KeyboardInterrupt:
+
+
+            display.stop()
+
+
+            print(
+                "\nGoodbye 👋"
+            )
+
+            break
+
+
+
+        except Exception as e:
+
+
+            logger.error(
+                f"Chat error: {e}"
+            )
+
+
+            print(
+                f"❌ Error: {e}"
+            )
 
 
 
@@ -253,48 +213,34 @@ def chat():
 # ASK MODE
 # =========================================================
 
-
 @app.command()
-
 def ask(
-
     question: str
-
 ):
 
-
     bot = init_assistant()
-
 
 
     display.start()
 
 
-
     try:
 
-
-
         question = clean_user_input(
-
             question
-
         )
-
 
 
         response = bot.process_input(
-
             question
-
         )
 
 
+        clear_status()
+
 
         print(
-
             f"NEXUS: {response}"
-
         )
 
 
@@ -302,29 +248,19 @@ def ask(
     except Exception as e:
 
 
-
         logger.error(
-
             f"Ask error: {e}"
-
         )
-
 
 
         print(
-
             f"❌ Error: {e}"
-
         )
-
 
 
     finally:
 
-
         display.stop()
-
-
 
 
 
@@ -332,19 +268,12 @@ def ask(
 # VERSION
 # =========================================================
 
-
 @app.command()
-
 def version():
 
-
     print(
-
         "NEXUS AI Assistant v1.0.0"
-
     )
-
-
 
 
 
@@ -352,36 +281,29 @@ def version():
 # HELP
 # =========================================================
 
-
 def print_help():
 
-
     print(
-
 """
 📌 Commands:
 
-- chat
+chat
     → Start interactive chat mode
 
-- ask "text"
+ask "text"
     → Ask NEXUS a single question
 
-- version
+version
     → Show version
 
-- exit
+exit
     → Exit chat mode
 
-- quit
+quit
     → Exit chat mode
 
 """
-
     )
-
-
-
 
 
 
@@ -389,21 +311,6 @@ def print_help():
 # ENTRY POINT
 # =========================================================
 
-
 if __name__ == "__main__":
 
-
-    if len(sys.argv) == 1:
-
-
-        init_assistant()
-
-
-        chat()
-
-
-
-    else:
-
-
-        app()
+    app()
