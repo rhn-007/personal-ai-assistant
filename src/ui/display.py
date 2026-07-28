@@ -3,8 +3,8 @@ NEXUS Display Manager
 
 Handles temporary animated status display.
 
-The animation disappears automatically
-when status.py clears the status.
+Animation is written to stderr so it does not
+conflict with application logs.
 """
 
 
@@ -14,7 +14,6 @@ import sys
 
 
 from src.ui.status import get_status
-
 
 
 
@@ -59,10 +58,11 @@ class NexusDisplay:
 
 
     # =====================================================
-    # ANIMATION LOOP
+    # DISPLAY LOOP
     # =====================================================
 
     def _loop(self):
+
 
         frames = [
 
@@ -89,46 +89,37 @@ class NexusDisplay:
             if status:
 
 
-                animation = frames[index % len(frames)]
+                frame = frames[index % len(frames)]
 
 
-                text = (
+                message = (
 
-                    f"[NEXUS] {animation} {status}..."
-
-                )
-
-
-                sys.stdout.write(
-
-                    "\r" + text
+                    f"\r[NEXUS] {frame} {status}..."
 
                 )
 
 
-                sys.stdout.flush()
+                sys.stderr.write(message)
 
+                sys.stderr.flush()
 
 
                 index += 1
 
 
 
-            else:
+            elif self.last_status:
 
 
-                if self.last_status:
+                # erase animation line
 
+                sys.stderr.write(
 
-                    sys.stdout.write(
+                    "\r" + (" " * 100) + "\r"
 
-                        "\r" + (" " * 80) + "\r"
+                )
 
-                    )
-
-
-                    sys.stdout.flush()
-
+                sys.stderr.flush()
 
 
                 index = 0
@@ -138,9 +129,7 @@ class NexusDisplay:
             self.last_status = status
 
 
-            time.sleep(
-                0.3
-            )
+            time.sleep(0.25)
 
 
 
@@ -150,11 +139,11 @@ class NexusDisplay:
 
     def stop(self):
 
+
         self.running = False
 
 
         if self.thread:
-
 
             self.thread.join(
 
@@ -163,14 +152,13 @@ class NexusDisplay:
             )
 
 
-        sys.stdout.write(
+        sys.stderr.write(
 
-            "\r" + (" " * 80) + "\r"
+            "\r" + (" " * 100) + "\r"
 
         )
 
-
-        sys.stdout.flush()
+        sys.stderr.flush()
 
 
         self.thread = None
