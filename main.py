@@ -16,11 +16,11 @@ import typer
 load_dotenv()
 
 
-
 from src.core.assistant import PersonalAssistant
 
 from src.utils.logger import setup_logger
 
+from src.ui.status import clear_status
 
 from src.ui.display import NexusDisplay
 
@@ -54,9 +54,7 @@ def init_assistant():
 
     if assistant is None:
 
-
         try:
-
 
             logger.info(
                 "Initializing Personal AI Assistant..."
@@ -67,7 +65,6 @@ def init_assistant():
 
 
         except Exception as e:
-
 
             logger.error(
                 f"Failed to initialize assistant: {e}"
@@ -80,7 +77,6 @@ def init_assistant():
 
 
             sys.exit(1)
-
 
 
     return assistant
@@ -101,19 +97,13 @@ def chat():
     bot = init_assistant()
 
 
-
-    # Start NEXUS display monitor
-
     display.start()
 
 
 
     print(
-
         "\n🤖 NEXUS Ready "
-
         "(type 'help' for commands)\n"
-
     )
 
 
@@ -125,9 +115,7 @@ def chat():
 
 
             user_input = input(
-
                 "You: "
-
             ).strip()
 
 
@@ -156,13 +144,13 @@ def chat():
             ]:
 
 
+                clear_status()
+
                 display.stop()
 
 
                 print(
-
                     "Goodbye 👋"
-
                 )
 
 
@@ -187,7 +175,6 @@ def chat():
 
 
 
-
             # ---------------------------------------------
             # PROCESS REQUEST
             # ---------------------------------------------
@@ -200,10 +187,17 @@ def chat():
             )
 
 
+            # IMPORTANT:
+            # Remove any leftover animation
+            # before displaying final answer
+
+            clear_status()
+
+
 
             print(
 
-                f"\nAssistant: {response}\n"
+                f"\nNEXUS: {response}\n"
 
             )
 
@@ -213,14 +207,13 @@ def chat():
         except KeyboardInterrupt:
 
 
+            clear_status()
 
             display.stop()
 
 
             print(
-
                 "\nGoodbye 👋"
-
             )
 
 
@@ -232,6 +225,8 @@ def chat():
 
         except Exception as e:
 
+
+            clear_status()
 
 
             logger.error(
@@ -285,10 +280,13 @@ def ask(
         )
 
 
+        clear_status()
+
+
 
         print(
 
-            response
+            f"NEXUS: {response}"
 
         )
 
@@ -296,6 +294,9 @@ def ask(
 
     except Exception as e:
 
+
+
+        clear_status()
 
 
         logger.error(
