@@ -1,26 +1,35 @@
 """
 NEXUS Status Manager
 
-Central communication bridge between:
-- Assistant modules
-- Tools
-- Display system
-- Animation system
+Stores the current operation being performed.
 
-This file only stores the current NEXUS activity.
+Example:
 
-It does NOT:
-- print anything
-- create animations
-- control the terminal
+set_status("Searching memory")
+
+display.py reads:
+
+Searching memory
+
+clear_status()
+
+display.py removes animation.
 """
+
+
+import threading
+
 
 
 # =========================================================
 # GLOBAL STATUS
 # =========================================================
 
+
 _current_status = None
+
+
+_status_lock = threading.Lock()
 
 
 
@@ -28,32 +37,29 @@ _current_status = None
 # SET STATUS
 # =========================================================
 
+
 def set_status(
-    message: str
+    status: str
 ):
+
     """
-    Updates the current NEXUS activity.
+    Update current NEXUS activity.
 
     Example:
-
-    set_status("Searching memory")
-
-    Animation displays:
-
-    [NEXUS] ○──○──◉ Searching memory...
+        set_status("Searching memory")
+        set_status("Thinking")
     """
+
 
     global _current_status
 
 
-    if not message:
-
-        _current_status = None
-
-        return
+    with _status_lock:
 
 
-    _current_status = message
+        _current_status = status
+
+
 
 
 
@@ -61,16 +67,28 @@ def set_status(
 # GET STATUS
 # =========================================================
 
+
 def get_status():
+
     """
-    Returns the current NEXUS activity.
+    Returns current NEXUS activity.
 
-    Example:
+    Returns:
 
-    "Searching memory"
+        "Searching memory"
+
+        "Thinking"
+
+        None
     """
 
-    return _current_status
+
+    with _status_lock:
+
+
+        return _current_status
+
+
 
 
 
@@ -78,27 +96,21 @@ def get_status():
 # CLEAR STATUS
 # =========================================================
 
-def clear_status():
-    """
-    Removes the current activity.
 
-    Used when NEXUS finishes processing.
+def clear_status():
+
     """
+    Remove current activity.
+
+    This tells display.py
+    to erase the animation.
+    """
+
 
     global _current_status
 
 
-    _current_status = None
+    with _status_lock:
 
 
-
-# =========================================================
-# CHECK STATUS
-# =========================================================
-
-def is_active():
-    """
-    Returns True if NEXUS currently has an active task.
-    """
-
-    return _current_status is not None
+        _current_status = None
