@@ -295,21 +295,19 @@ class PersonalAssistant:
             "Sending memory to Ollama for relevance analysis..."
         )
 
-
-        relevant_memory = (
-
-            self.llm.analyze_memory(
-
-                query,
-
-                memory_snapshot
-
+        try:
+            relevant_memory = (
+                self.llm.analyze_memory(
+                    query,
+                    memory_snapshot
+    
+                )
+    
             )
 
-        )
+        finally:
 
-
-        clear_status()
+            clear_status()
 
 
 
@@ -319,7 +317,7 @@ class PersonalAssistant:
                 "No relevant memory was found."
             )
 
-
+    
 
         lines = [
 
