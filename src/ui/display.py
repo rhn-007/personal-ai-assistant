@@ -1,13 +1,20 @@
 """
 NEXUS Display System
 
-Controls:
-- Terminal animation
-- Status monitoring
-- Automatic start/stop behaviour
+Temporary terminal HUD.
 
-This file connects:
-status.py  →  animation display
+The animation is NOT a log.
+It exists only while NEXUS is performing a task.
+
+Flow:
+
+status.py
+    ↓
+display.py
+    ↓
+temporary animation
+    ↓
+clear when finished
 """
 
 
@@ -16,24 +23,20 @@ import threading
 import time
 
 
-from src.ui.status import (
-    get_status,
-    is_active
-)
+from src.ui.status import get_status
 
 
 
 class NexusDisplay:
-    """
-    Main NEXUS terminal display controller.
-    """
 
 
     def __init__(self):
 
-        self.stop_event = threading.Event()
+        self.running = False
 
-        self.animation_thread = None
+        self.thread = None
+
+        self.current_status = None
 
 
         self.frames = [
@@ -54,52 +57,87 @@ class NexusDisplay:
 
 
     # =====================================================
-    # START DISPLAY MONITOR
+    # START DISPLAY
     # =====================================================
 
+
     def start(self):
-        """
-        Starts monitoring the NEXUS status.
 
-        Animation only appears when
-        status.py contains an active status.
-        """
+        if self.running:
+
+            return
 
 
-        self.stop_event.clear()
+        self.running = True
 
 
-        self.animation_thread = threading.Thread(
+        self.thread = threading.Thread(
 
-            target=self._monitor_status,
+            target=self._display_loop,
 
             daemon=True
 
         )
 
 
-        self.animation_thread.start()
+        self.thread.start()
 
 
 
     # =====================================================
-    # STATUS MONITOR
+    # DISPLAY LOOP
     # =====================================================
 
-    def _monitor_status(self):
+
+    def _display_loop(self):
 
 
-        while not self.stop_event.is_set():
+        while self.running:
 
 
-            if is_active():
-
-                self._draw_animation()
+            status = get_status()
 
 
-            time.sleep(
-                0.25
-            )
+
+            # -------------------------------------------------
+            # STATUS ACTIVE
+            # -------------------------------------------------
+
+            if status:
+
+
+                if status != self.current_status:
+
+
+                    self.clear()
+
+
+                    self.current_status = status
+
+
+
+                self.draw(status)
+
+
+
+            # -------------------------------------------------
+            # NO STATUS
+            # -------------------------------------------------
+
+            else:
+
+
+                if self.current_status:
+
+
+                    self.clear()
+
+
+                    self.current_status = None
+
+
+
+            time.sleep(0.25)
 
 
 
@@ -107,15 +145,11 @@ class NexusDisplay:
     # DRAW ANIMATION
     # =====================================================
 
-    def _draw_animation(self):
 
-
-        status = get_status()
-
-
-        if not status:
-
-            return
+    def draw(
+        self,
+        status
+    ):
 
 
         frame = self.frames[
@@ -135,6 +169,7 @@ class NexusDisplay:
         sys.stdout.flush()
 
 
+
         self.frame_index = (
 
             self.frame_index + 1
@@ -144,13 +179,11 @@ class NexusDisplay:
 
 
     # =====================================================
-    # CLEAR DISPLAY
+    # CLEAR CURRENT ANIMATION
     # =====================================================
 
+
     def clear(self):
-        """
-        Removes animation from terminal.
-        """
 
 
         sys.stdout.write(
@@ -165,19 +198,22 @@ class NexusDisplay:
 
 
     # =====================================================
-    # STOP DISPLAY
+    # STOP
     # =====================================================
+
 
     def stop(self):
 
 
-        self.stop_event.set()
-
-
-        if self.animation_thread:
-
-            self.animation_thread.join()
-
+        self.running = False
 
 
         self.clear()
+
+
+        if self.thread:
+
+
+            self.thread.join(
+                timeout=1
+            )
