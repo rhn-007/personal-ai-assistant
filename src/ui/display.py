@@ -1,16 +1,14 @@
 """
 NEXUS Display Manager
 
-Handles animated temporary status display.
+Windows-compatible animated status display.
 
 Features:
-
-- Smooth animation
-- Different animations for different tasks
-- Automatic cleanup
-- No freezing
-- Does not interfere with logs
-- Works with stderr output
+- Separate animation thread
+- Does not freeze
+- Handles status changes
+- Clears animation correctly
+- Prevents terminal corruption
 """
 
 
@@ -39,12 +37,10 @@ class NexusDisplay:
 
         self.current_line = False
 
-        self.lock = threading.Lock()
-
 
 
     # =====================================================
-    # START DISPLAY
+    # START
     # =====================================================
 
     def start(self):
@@ -71,33 +67,28 @@ class NexusDisplay:
 
 
     # =====================================================
-    # ANIMATION DATABASE
+    # ANIMATION TYPES
     # =====================================================
 
-    def _get_animation(self, status):
-
+    def _get_frames(self, status):
 
         status = status.lower()
 
 
 
-        # MEMORY
-
         if "memory" in status:
 
             return [
 
-                "○──○──◉",
+                "◉──○──○",
 
                 "○──◉──○",
 
-                "◉──○──○"
+                "○──○──◉"
 
             ]
 
 
-
-        # THINKING
 
         if "thinking" in status:
 
@@ -115,29 +106,19 @@ class NexusDisplay:
 
 
 
-        # BROWSER
-
-        if (
-
-            "browser" in status
-
-            or "search" in status
-
-        ):
+        if "browser" in status or "search" in status:
 
             return [
 
-                "🌐○──○",
+                "🌐 ○──○",
 
-                "🌐─○─○",
+                "🌐 ─○─",
 
-                "🌐──○◉"
+                "🌐 ○──◉"
 
             ]
 
 
-
-        # SPOTIFY
 
         if "spotify" in status:
 
@@ -153,8 +134,6 @@ class NexusDisplay:
 
 
 
-        # EMAIL
-
         if "email" in status:
 
             return [
@@ -168,8 +147,6 @@ class NexusDisplay:
             ]
 
 
-
-        # CALENDAR
 
         if "calendar" in status:
 
@@ -185,8 +162,6 @@ class NexusDisplay:
 
 
 
-        # TOOLS
-
         if "tool" in status:
 
             return [
@@ -200,30 +175,6 @@ class NexusDisplay:
             ]
 
 
-
-        # SYSTEM
-
-        if (
-
-            "opening" in status
-
-            or "launching" in status
-
-        ):
-
-            return [
-
-                "▶ ○──○",
-
-                "▶ ─○─",
-
-                "▶ ○──◉"
-
-            ]
-
-
-
-        # DEFAULT
 
         return [
 
@@ -240,23 +191,20 @@ class NexusDisplay:
 
 
     # =====================================================
-    # CLEAR CURRENT LINE
+    # CLEAR LINE
     # =====================================================
 
     def _clear_line(self):
 
-
         if self.current_line:
 
-
-            sys.stderr.write(
+            sys.stdout.write(
 
                 "\r" + (" " * 120) + "\r"
 
             )
 
-
-            sys.stderr.flush()
+            sys.stdout.flush()
 
 
             self.current_line = False
@@ -266,7 +214,7 @@ class NexusDisplay:
 
 
     # =====================================================
-    # MAIN LOOP
+    # DISPLAY LOOP
     # =====================================================
 
     def _loop(self):
@@ -279,8 +227,7 @@ class NexusDisplay:
         while self.running:
 
 
-
-            # Safety timeout
+            # Prevent infinite animation
 
             auto_clear_timeout()
 
@@ -290,9 +237,7 @@ class NexusDisplay:
 
 
 
-            # ------------------------------------------------
-            # NO ACTIVE TASK
-            # ------------------------------------------------
+            # No task
 
             if not status:
 
@@ -308,16 +253,12 @@ class NexusDisplay:
 
                 time.sleep(0.1)
 
-
                 continue
 
 
 
 
-
-            # ------------------------------------------------
-            # STATUS CHANGED
-            # ------------------------------------------------
+            # New status
 
             if status != self.last_status:
 
@@ -329,48 +270,42 @@ class NexusDisplay:
 
 
 
-
-            animation = self._get_animation(
-
-                status
-
-            )
+            frames = self._get_frames(status)
 
 
 
-            frame = animation[
+            frame = frames[
 
-                frame_index % len(animation)
+                frame_index % len(frames)
 
             ]
 
 
 
-            sys.stderr.write(
+            # Write animation
+
+            sys.stdout.write(
 
                 f"\r[NEXUS] {frame} {status}..."
 
             )
 
 
-            sys.stderr.flush()
+            sys.stdout.flush()
 
 
 
             self.current_line = True
 
 
-
             self.last_status = status
-
 
 
             frame_index += 1
 
 
 
-            time.sleep(0.3)
-
+            time.sleep(0.25)
 
 
 
