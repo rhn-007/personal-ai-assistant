@@ -377,9 +377,6 @@ class PersonalAssistant:
             return None
     
     
-        finally:
-    
-            clear_status()
             
     def _run_agent_loop(
         self,
@@ -416,9 +413,6 @@ class PersonalAssistant:
             return None
     
     
-        finally:
-    
-            clear_status()
    
 
     def process_input(
@@ -479,6 +473,9 @@ class PersonalAssistant:
                     user_input
                 )
             ):
+                set_status(
+                    "Searching email"
+                )
 
                 response = self._handle_email_query(
                     user_input
