@@ -102,9 +102,11 @@ def chat():
 
         while True:
 
+            clear_status()
+
             user_input = input(
                 "You: "
-            )
+            ).strip()
 
 
             user_input = clean_user_input(
@@ -158,6 +160,8 @@ def chat():
             print(
                 f"\nNEXUS: {response}\n"
             )
+
+            display.start()
 
 
             time.sleep(0.05)
