@@ -446,46 +446,92 @@ class Planner:
 
     def _plan_calendar(self, text):
 
-        calendar_phrases = [
-
-            "remind me",
-
-            "set a reminder",
-
-            "create a reminder",
-
-            "schedule a reminder",
-
-            "schedule an event",
-
-            "create an event",
-
-            "calendar event",
-
-            "appointment"
-
+        # VIEW CALENDAR
+    
+        view_phrases = [
+    
+            "show my calendar",
+    
+            "view my calendar",
+    
+            "open my calendar",
+    
+            "what is on my calendar",
+    
+            "what's on my calendar",
+    
+            "show my events",
+    
+            "list my events",
+    
+            "my schedule",
+    
+            "show schedule",
+    
+            "calendar"
+    
         ]
-
+    
+    
         if any(
-
             phrase in text
-
-            for phrase in calendar_phrases
-
+            for phrase in view_phrases
         ):
-
+    
             return {
-
+    
                 "tool": "calendar",
-
-                "action": "create",
-
+    
+                "action": "view",
+    
                 "query": text
-
+    
             }
-
+    
+    
+        # CREATE EVENTS
+    
+        create_phrases = [
+    
+            "remind me",
+    
+            "set a reminder",
+    
+            "create a reminder",
+    
+            "schedule a reminder",
+    
+            "schedule an event",
+    
+            "create an event",
+    
+            "calendar event",
+    
+            "appointment"
+    
+        ]
+    
+    
+        if any(
+    
+            phrase in text
+    
+            for phrase in create_phrases
+    
+        ):
+    
+            return {
+    
+                "tool": "calendar",
+    
+                "action": "create",
+    
+                "query": text
+    
+            }
+    
+    
         return None
-
     # =====================================================
     # SYSTEM
     # =====================================================
