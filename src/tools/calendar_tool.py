@@ -20,6 +20,7 @@ class CalendarTool:
             "CalendarTool initialized"
         )
 
+
     # =====================================================
     # PARSE NATURAL LANGUAGE EVENT
     # =====================================================
@@ -27,6 +28,7 @@ class CalendarTool:
     def parse_event(self, query):
 
         text = query.lower().strip()
+
 
         # -----------------------------
         # EXTRACT TIME
@@ -38,6 +40,7 @@ class CalendarTool:
         )
 
         event_time = None
+
 
         if time_match:
 
@@ -53,23 +56,28 @@ class CalendarTool:
 
             period = time_match.group(3)
 
+
             if period == "pm" and hour != 12:
 
                 hour += 12
+
 
             elif period == "am" and hour == 12:
 
                 hour = 0
 
+
             event_time = (
                 f"{hour:02d}:{minute:02d}"
             )
+
 
         # -----------------------------
         # EXTRACT DATE
         # -----------------------------
 
         today = datetime.now().date()
+
 
         if (
             "tomorrow" in text
@@ -80,11 +88,13 @@ class CalendarTool:
                 today + timedelta(days=1)
             ).isoformat()
 
+
         elif "today" in text:
 
             event_date = (
                 today.isoformat()
             )
+
 
         else:
 
@@ -92,11 +102,13 @@ class CalendarTool:
                 today.isoformat()
             )
 
+
         # -----------------------------
         # CLEAN TITLE
         # -----------------------------
 
         title = text
+
 
         phrases_to_remove = [
 
@@ -123,7 +135,9 @@ class CalendarTool:
             "tmrw",
 
             "for"
+
         ]
+
 
         for phrase in phrases_to_remove:
 
@@ -131,6 +145,7 @@ class CalendarTool:
                 phrase,
                 ""
             )
+
 
         # -----------------------------
         # REMOVE TIME
@@ -143,9 +158,6 @@ class CalendarTool:
                 ""
             )
 
-        # -----------------------------
-        # CLEAN EXTRA SPACES
-        # -----------------------------
 
         title = re.sub(
             r"\s+",
@@ -153,9 +165,11 @@ class CalendarTool:
             title
         ).strip()
 
+
         if not title:
 
             title = "Reminder"
+
 
         return {
 
@@ -166,6 +180,7 @@ class CalendarTool:
             "time": event_time
 
         }
+
 
     # =====================================================
     # CREATE EVENT
@@ -180,9 +195,11 @@ class CalendarTool:
                 "to schedule."
             )
 
+
         event = self.parse_event(
             query
         )
+
 
         created = self.calendar.create_event(
 
@@ -194,18 +211,19 @@ class CalendarTool:
 
         )
 
+
         return (
 
-            f"📅 Reminder created!\n"
+            "📅 Reminder created!\n"
 
             f"Event: {created['title']}\n"
 
             f"Date: {created['date']}\n"
 
-            f"Time: "
-            f"{created['time'] or 'Any time'}"
+            f"Time: {created['time'] or 'Any time'}"
 
         )
+
 
     # =====================================================
     # SHOW EVENTS
@@ -217,17 +235,20 @@ class CalendarTool:
             self.calendar.get_all_events()
         )
 
+
         if not events:
 
             return (
                 "You have no calendar events."
             )
 
+
         output = [
 
             "📅 Your Calendar:"
 
         ]
+
 
         for event in events:
 
@@ -239,6 +260,7 @@ class CalendarTool:
 
             event_time = event[4]
 
+
             output.append(
 
                 f"{event_id}. "
@@ -248,9 +270,11 @@ class CalendarTool:
 
             )
 
+
         return "\n".join(
             output
         )
+
 
     # =====================================================
     # EXTRACT DELETE TITLE
@@ -260,48 +284,52 @@ class CalendarTool:
 
         text = query.lower().strip()
 
+
         phrases_to_remove = [
 
             "delete reminder for",
 
             "delete event for",
-    
+
             "delete appointment for",
-    
+
             "remove reminder for",
-    
+
             "remove event for",
-    
+
             "remove appointment for",
-    
+
             "cancel reminder for",
-    
+
             "cancel event for",
-    
+
             "cancel appointment for",
-    
+
             "delete",
-    
+
             "remove",
-    
+
             "cancel",
-    
+
             "reminder",
-    
+
             "event",
-    
+
             "appointment",
-    
+
             "the",
-    
+
             "my",
-    
+
             "this",
-    
+
             "for"
+
         ]
 
+
         title = text
+
 
         for phrase in phrases_to_remove:
 
@@ -310,13 +338,16 @@ class CalendarTool:
                 ""
             )
 
+
         title = re.sub(
             r"\s+",
             " ",
             title
         ).strip()
 
+
         return title
+
 
     # =====================================================
     # DELETE EVENT
@@ -326,6 +357,7 @@ class CalendarTool:
 
         delete_title = None
 
+
         if query:
 
             delete_title = (
@@ -334,9 +366,6 @@ class CalendarTool:
                 )
             )
 
-        # ---------------------------------
-        # DELETE SPECIFIC EVENT
-        # ---------------------------------
 
         if delete_title:
 
@@ -346,12 +375,14 @@ class CalendarTool:
                 )
             )
 
+
             if not event:
 
                 return (
                     f"❌ Could not find an event "
                     f"matching '{delete_title}'."
                 )
+
 
             return (
 
@@ -360,19 +391,18 @@ class CalendarTool:
 
             )
 
-        # ---------------------------------
-        # DELETE LATEST EVENT
-        # ---------------------------------
 
         event = (
             self.calendar.delete_latest_event()
         )
+
 
         if not event:
 
             return (
                 "There are no events to delete."
             )
+
 
         return (
 
@@ -381,19 +411,17 @@ class CalendarTool:
 
         )
 
+
     # =====================================================
     # EXECUTE ACTION
     # =====================================================
 
     def execute_action(
-
         self,
-
         action,
-
         query=None
-
     ):
+
 
         if action == "create":
 
@@ -401,21 +429,26 @@ class CalendarTool:
                 query
             )
 
+
         if action in [
 
             "list",
 
-            "show"
+            "show",
+
+            "view"
 
         ]:
 
             return self.show_events()
+
 
         if action == "delete":
 
             return self.delete_event(
                 query
             )
+
 
         return (
 
@@ -424,12 +457,16 @@ class CalendarTool:
 
         )
 
+
     # =====================================================
     # TOOL MANAGER COMPATIBILITY
     # =====================================================
 
     def execute(self, query):
 
-        return self.create_event(
-            query
+        return (
+
+            "Please specify a calendar action "
+            "such as show, create, or delete."
+
         )
