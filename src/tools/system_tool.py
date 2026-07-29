@@ -1,5 +1,6 @@
 import os
 import subprocess
+import re
 
 from src.utils.logger import setup_logger
 
@@ -9,217 +10,291 @@ logger = setup_logger(__name__)
 
 class SystemTool:
 
+
     def __init__(self):
 
         self.name = "system"
 
-        logger.info("SystemTool initialized")
+        logger.info(
+            "SystemTool initialized"
+        )
 
-    def open_target(self, query: str):
+
+
+    def can_handle(self, query):
 
         if not query:
-            return "No application or folder specified."
+            return False
+
+
+        text = query.lower()
+
+
+        return any(
+            cmd in text
+            for cmd in [
+                "open",
+                "launch",
+                "start"
+            ]
+        )
+
+
+
+    def clean_query(self, query):
 
         q = query.lower().strip()
 
-        # Remove common command words
-        for word in ["open", "launch", "start"]:
-            q = q.replace(word, "").strip()
 
-        # =====================================================
-        # APPLICATIONS
-        # =====================================================
+        q = re.sub(
+            r"\b(open|launch|start)\b",
+            "",
+            q
+        )
+
+
+        return q.strip()
+
+
+
+    def open_target(self, query):
+
+        if not query:
+
+            return (
+                "No application specified."
+            )
+
+
+        q = self.clean_query(query)
+
+
 
         apps = {
 
-            "notepad": "notepad.exe",
 
-            "calculator": "calc.exe",
+            "notepad":
+                "notepad.exe",
 
-            "calc": "calc.exe",
 
-            "paint": "mspaint.exe",
+            "calculator":
+                "calc.exe",
 
-            # OPERA
-            "opera": [
-                r"C:\Users\%USERNAME%\AppData\Local\Programs\Opera\opera.exe",
-                r"C:\Program Files\Opera\launcher.exe",
-                r"C:\Program Files (x86)\Opera\launcher.exe"
-            ],
 
-            # WHATSAPP
-            "whatsapp": [
+            "calc":
+                "calc.exe",
 
-                r"C:\Users\%USERNAME%\AppData\Local\WhatsApp\WhatsApp.exe",
-            
-                r"C:\Program Files\WindowsApps\5319275A.WhatsAppDesktop_*\WhatsApp.exe"
-            
-            ],
 
-            # SPOTIFY
-            "spotify": [
+            "paint":
+                "mspaint.exe",
 
-                r"C:\Users\%USERNAME%\AppData\Roaming\Spotify\Spotify.exe",
 
-                r"C:\Users\%USERNAME%\AppData\Local\Spotify\Spotify.exe",
 
-                r"C:\Program Files\Spotify\Spotify.exe",
+            "spotify":
 
-                r"C:\Program Files (x86)\Spotify\Spotify.exe",
+                [
 
-                r"C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Spotify.lnk"
+                    r"%APPDATA%\Spotify\Spotify.exe",
 
-            ]
+                    r"%LOCALAPPDATA%\Spotify\Spotify.exe"
+
+                ],
+
+
+
+            "whatsapp":
+
+                [
+
+                    r"%LOCALAPPDATA%\WhatsApp\WhatsApp.exe"
+
+                ]
 
         }
+
+
 
         if q in apps:
 
+
             try:
 
-                app_paths = apps[q]
 
-                # =================================================
-                # MULTIPLE POSSIBLE PATHS
-                # =================================================
+                paths = apps[q]
 
-                if isinstance(app_paths, list):
 
-                    for path in app_paths:
 
-                        # Expand %USERNAME% and environment variables
-                        path = os.path.expandvars(path)
+                if isinstance(
+                    paths,
+                    list
+                ):
+
+
+                    for path in paths:
+
+
+                        path = os.path.expandvars(
+                            path
+                        )
+
 
                         if os.path.exists(path):
 
-                            if path.lower().endswith(".lnk"):
 
-                                os.startfile(path)
-
-                            else:
-
-                                subprocess.Popen([path])
-
-                            logger.info(
-                                f"Opened {q}: {path}"
+                            subprocess.Popen(
+                                [path]
                             )
 
-                            return f"Opened {q}."
 
-                    # =================================================
-                    # SPOTIFY URI FALLBACK
-                    # =================================================
+                            logger.info(
+                                f"Opened {q}"
+                            )
+
+
+                            return (
+                                f"Opened {q}."
+                            )
+
+
+
+                    # URI fallback
 
                     if q == "spotify":
 
-                        try:
+                        os.startfile(
+                            "spotify:"
+                        )
 
-                            os.startfile("spotify:")
+                        return (
+                            "Opened spotify."
+                        )
 
-                            logger.info(
-                                "Opened Spotify using spotify URI"
-                            )
 
-                            return "Opened spotify."
 
-                        except Exception as e:
+                    if q == "whatsapp":
 
-                            logger.error(
-                                f"Spotify URI failed: {e}"
-                            )
+                        os.startfile(
+                            "whatsapp:"
+                        )
+
+                        return (
+                            "Opened whatsapp."
+                        )
+
+
 
                     return (
-                        f"Could not find the installed "
-                        f"{q} application."
+                        f"{q} application not found."
                     )
 
-                # =================================================
-                # NORMAL EXECUTABLE
-                # =================================================
 
-                subprocess.Popen([app_paths])
 
-                logger.info(
-                    f"Opened application: {q}"
+                subprocess.Popen(
+                    [paths]
                 )
 
-                return f"Opened {q}."
+
+                return (
+                    f"Opened {q}."
+                )
+
+
 
             except Exception as e:
 
+
                 logger.error(
-                    f"Failed to open {q}: {e}"
+                    f"Failed opening {q}: {e}"
                 )
+
 
                 return (
                     f"Could not open {q}: {e}"
                 )
 
-        # =====================================================
-        # COMMON FOLDERS
-        # =====================================================
+
+
 
         folders = {
 
-            "downloads": os.path.join(
-                os.path.expanduser("~"),
-                "Downloads"
-            ),
 
-            "documents": os.path.join(
-                os.path.expanduser("~"),
-                "Documents"
-            ),
+            "downloads":
+                os.path.join(
+                    os.path.expanduser("~"),
+                    "Downloads"
+                ),
 
-            "desktop": os.path.join(
-                os.path.expanduser("~"),
-                "Desktop"
-            )
+
+            "documents":
+                os.path.join(
+                    os.path.expanduser("~"),
+                    "Documents"
+                ),
+
+
+            "desktop":
+                os.path.join(
+                    os.path.expanduser("~"),
+                    "Desktop"
+                )
 
         }
 
+
+
         if q in folders:
+
 
             try:
 
-                os.startfile(folders[q])
 
-                logger.info(
-                    f"Opened folder: {q}"
+                os.startfile(
+                    folders[q]
                 )
 
-                return f"Opened {q}."
+
+                return (
+                    f"Opened {q}."
+                )
+
 
             except Exception as e:
 
-                logger.error(
-                    f"Failed to open folder {q}: {e}"
-                )
 
                 return (
                     f"Could not open {q}: {e}"
                 )
 
+
+
         return (
-            f"I don't know how to open "
-            f"'{q}' yet."
+            f"I don't know how to open '{q}' yet."
         )
+
+
 
     def execute_action(
         self,
-        action: str,
-        query: str
+        action,
+        query
     ):
+
 
         if action == "open":
 
-            return self.open_target(query)
+            return self.open_target(
+                query
+            )
+
 
         return (
-            f"Unknown system action: "
-            f"{action}"
+            f"Unknown system action: {action}"
         )
 
-    def execute(self, query: str):
 
-        return self.open_target(query)
+
+    def execute(self, query):
+
+        return self.open_target(
+            query
+        )
