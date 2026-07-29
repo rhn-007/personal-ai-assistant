@@ -1,12 +1,12 @@
 """
 NEXUS Status Manager
 
-Thread-safe temporary operation states.
+Thread-safe assistant state manager.
 
-Controls:
-- Current assistant state
-- Status timing
-- Automatic timeout clearing
+Features:
+- Thread-safe status updates
+- Status timeout protection
+- Automatic stale-state recovery
 """
 
 
@@ -14,12 +14,14 @@ import threading
 import time
 
 
-
 _current_status = None
 
 _status_start_time = None
 
 _status_lock = threading.RLock()
+
+
+DEFAULT_TIMEOUT = 120
 
 
 
@@ -50,13 +52,6 @@ def set_status(status: str):
     with _status_lock:
 
 
-        # Do not restart timer for same status
-
-        if _current_status == status:
-
-            return
-
-
         _current_status = status
 
         _status_start_time = time.monotonic()
@@ -68,6 +63,8 @@ def set_status(status: str):
 # =====================================================
 
 def get_status():
+
+    auto_clear_timeout()
 
     with _status_lock:
 
@@ -87,7 +84,6 @@ def clear_status():
 
     with _status_lock:
 
-
         _current_status = None
 
         _status_start_time = None
@@ -95,10 +91,12 @@ def clear_status():
 
 
 # =====================================================
-# STATUS ACTIVE CHECK
+# ACTIVE CHECK
 # =====================================================
 
 def is_active():
+
+    auto_clear_timeout()
 
     with _status_lock:
 
@@ -107,37 +105,32 @@ def is_active():
 
 
 # =====================================================
-# STATUS AGE
+# AGE
 # =====================================================
 
 def get_status_age():
 
     with _status_lock:
 
-
         if _status_start_time is None:
 
             return 0
 
 
-        return max(
-
-            0,
-
+        return (
             time.monotonic()
             -
             _status_start_time
-
         )
 
 
 
 # =====================================================
-# AUTOMATIC TIMEOUT
+# TIMEOUT PROTECTION
 # =====================================================
 
 def auto_clear_timeout(
-    seconds=120
+    seconds=DEFAULT_TIMEOUT
 ):
 
     global _current_status
@@ -147,24 +140,26 @@ def auto_clear_timeout(
     with _status_lock:
 
 
-        if (
+        if not _current_status:
 
-            _current_status
+            return False
 
-            and
 
+
+        if not _status_start_time:
+
+            return False
+
+
+
+        age = (
+            time.monotonic()
+            -
             _status_start_time
+        )
 
-            and
 
-            (
-                time.monotonic()
-                -
-                _status_start_time
-            )
-            > seconds
-
-        ):
+        if age > seconds:
 
 
             _current_status = None
