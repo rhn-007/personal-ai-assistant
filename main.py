@@ -5,16 +5,19 @@ Personal AI Assistant - Main Entry Point
 NEXUS
 """
 
+
 import sys
-import time
 
 from dotenv import load_dotenv
 import typer
 
+
 from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
+
 from src.ui.display import NexusDisplay
 from src.ui.status import clear_status
+
 
 
 load_dotenv()
@@ -28,6 +31,7 @@ app = typer.Typer()
 
 assistant = None
 
+
 display = NexusDisplay()
 
 
@@ -35,6 +39,7 @@ display = NexusDisplay()
 def init_assistant():
 
     global assistant
+
 
     if assistant is None:
 
@@ -44,23 +49,29 @@ def init_assistant():
                 "Initializing Personal AI Assistant..."
             )
 
+
             assistant = PersonalAssistant()
 
 
         except Exception as e:
 
+
             logger.error(
-                f"Failed to initialize assistant: {e}"
+                f"Assistant initialization failed: {e}"
             )
 
+
             print(
-                f"❌ Initialization error: {e}"
+                f"Initialization error: {e}"
             )
+
 
             sys.exit(1)
 
 
+
     return assistant
+
 
 
 
@@ -85,12 +96,15 @@ def clean_user_input(text):
 
 
 
+
 @app.command()
 def chat():
 
     bot = init_assistant()
 
+
     display.start()
+
 
 
     print(
@@ -98,15 +112,24 @@ def chat():
     )
 
 
+
     try:
+
 
         while True:
 
-            clear_status()
+
+
+            # Stop animation before user input
+
+            display.clear_now()
+
+
 
             user_input = input(
                 "You: "
             ).strip()
+
 
 
             user_input = clean_user_input(
@@ -114,14 +137,17 @@ def chat():
             )
 
 
+
             if not user_input:
 
                 continue
 
 
+
             logger.info(
                 f"User input: {user_input}"
             )
+
 
 
             command = user_input.lower()
@@ -132,6 +158,7 @@ def chat():
                 "quit",
                 "exit"
             ]:
+
 
                 print(
                     "Goodbye 👋"
@@ -149,10 +176,20 @@ def chat():
 
 
 
+
+            # Start animation
+
+            display.start()
+
+
+
             response = bot.process_input(
                 user_input
             )
 
+
+
+            # Completely remove animation
 
             display.clear_now()
 
@@ -162,34 +199,39 @@ def chat():
                 f"\nNEXUS: {response}\n"
             )
 
-            display.start()
-
-
-            time.sleep(0.05)
-
 
 
     except KeyboardInterrupt:
+
 
         print(
             "\nGoodbye 👋"
         )
 
 
+
     except Exception as e:
+
 
         logger.error(
             f"Chat error: {e}"
         )
 
+
         print(
-            f"❌ Error: {e}"
+            f"Error: {e}"
         )
+
 
 
     finally:
 
+
         display.stop()
+
+
+
+
 
 
 
@@ -198,29 +240,18 @@ def ask(
     question: str
 ):
 
+
     bot = init_assistant()
+
 
     display.start()
 
 
     try:
 
+
         question = clean_user_input(
             question
-        )
-
-
-        if not question:
-
-            print(
-                "Please enter a question."
-            )
-
-            return
-
-
-        logger.info(
-            f"User input: {question}"
         )
 
 
@@ -229,7 +260,7 @@ def ask(
         )
 
 
-        clear_status()
+        display.clear_now()
 
 
         print(
@@ -237,7 +268,9 @@ def ask(
         )
 
 
+
     except Exception as e:
+
 
         logger.error(
             f"Ask error: {e}"
@@ -245,13 +278,19 @@ def ask(
 
 
         print(
-            f"❌ Error: {e}"
+            f"Error: {e}"
         )
+
 
 
     finally:
 
+
         display.stop()
+
+
+
+
 
 
 
@@ -261,6 +300,9 @@ def version():
     print(
         "NEXUS AI Assistant v1.0.0"
     )
+
+
+
 
 
 
@@ -287,6 +329,9 @@ quit
 
 """
     )
+
+
+
 
 
 
