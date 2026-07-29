@@ -16,8 +16,6 @@ from src.core.assistant import PersonalAssistant
 from src.utils.logger import setup_logger
 
 from src.ui.display import NexusDisplay
-from src.ui.status import clear_status
-
 
 
 load_dotenv()
@@ -35,6 +33,10 @@ assistant = None
 display = NexusDisplay()
 
 
+
+# =====================================================
+# INITIALIZE ASSISTANT
+# =====================================================
 
 def init_assistant():
 
@@ -69,11 +71,13 @@ def init_assistant():
             sys.exit(1)
 
 
-
     return assistant
 
 
 
+# =====================================================
+# CLEAN INPUT
+# =====================================================
 
 def clean_user_input(text):
 
@@ -96,12 +100,17 @@ def clean_user_input(text):
 
 
 
+# =====================================================
+# CHAT MODE
+# =====================================================
 
 @app.command()
 def chat():
 
     bot = init_assistant()
 
+
+    # Start display engine once
 
     display.start()
 
@@ -117,12 +126,6 @@ def chat():
 
 
         while True:
-
-
-
-            # Stop animation before user input
-
-            display.clear_now()
 
 
 
@@ -155,8 +158,11 @@ def chat():
 
 
             if command in [
+
                 "quit",
+
                 "exit"
+
             ]:
 
 
@@ -176,12 +182,7 @@ def chat():
 
 
 
-
-            # Start animation
-
-            display.start()
-
-
+            # Assistant controls status
 
             response = bot.process_input(
                 user_input
@@ -189,14 +190,10 @@ def chat():
 
 
 
-            # Completely remove animation
-
-            display.clear_now()
-
-
-
             print(
+
                 f"\nNEXUS: {response}\n"
+
             )
 
 
@@ -233,7 +230,9 @@ def chat():
 
 
 
-
+# =====================================================
+# SINGLE QUESTION MODE
+# =====================================================
 
 @app.command()
 def ask(
@@ -245,6 +244,7 @@ def ask(
 
 
     display.start()
+
 
 
     try:
@@ -260,11 +260,10 @@ def ask(
         )
 
 
-        display.clear_now()
-
-
         print(
+
             f"NEXUS: {response}"
+
         )
 
 
@@ -292,7 +291,9 @@ def ask(
 
 
 
-
+# =====================================================
+# VERSION
+# =====================================================
 
 @app.command()
 def version():
@@ -305,6 +306,9 @@ def version():
 
 
 
+# =====================================================
+# HELP
+# =====================================================
 
 def print_help():
 
@@ -334,6 +338,9 @@ quit
 
 
 
+# =====================================================
+# ENTRY
+# =====================================================
 
 if __name__ == "__main__":
 
