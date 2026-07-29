@@ -154,7 +154,8 @@ def chat():
             )
 
 
-            clear_status()
+            display.clear_now()
+
 
 
             print(
