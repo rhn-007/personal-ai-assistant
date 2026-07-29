@@ -88,6 +88,16 @@ class SystemTool:
             "paint":
                 "mspaint.exe",
 
+            "opera": [
+
+                r"C:\Users\%USERNAME%\AppData\Local\Programs\Opera\launcher.exe",
+            
+                r"C:\Program Files\Opera\launcher.exe",
+            
+                r"C:\Program Files (x86)\Opera\launcher.exe"
+            
+            ],
+
 
 
             "spotify":
