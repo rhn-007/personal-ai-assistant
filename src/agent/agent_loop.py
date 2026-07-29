@@ -1,17 +1,10 @@
 """
 NEXUS Agent Loop
 
-Handles:
-- Complex task execution
-- Planner-based workflows
-- Multi-step tool execution
-- Task tracking
-- Result normalization
-
-Simple commands should be handled by ToolManager first.
-AgentLoop is used as a secondary execution layer.
+Runs tools safely without blocking UI.
 """
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from src.planner.planner import Planner
 from src.tools.tool_manager import ToolManager
@@ -25,127 +18,68 @@ from src.ui.status import set_status, clear_status
 logger = setup_logger(__name__)
 
 
+executor = ThreadPoolExecutor(
+    max_workers=4
+)
+
+
 class AgentLoop:
 
 
     def __init__(
         self,
         tool_manager: ToolManager,
-        planner: Planner = None,
-        task_manager: TaskManager = None
+        planner=None,
+        task_manager=None
     ):
-
 
         self.tool_manager = tool_manager
 
-
         self.planner = (
-
             planner
-
             if planner
-
             else Planner(tool_manager)
-
         )
-
 
         self.task_manager = (
-
             task_manager
-
             if task_manager
-
             else TaskManager()
-
         )
 
 
+    # ==========================================
+    # RUN
+    # ==========================================
 
-    # =====================================================
-    # RUN AGENT
-    # =====================================================
-
-    def run(
-        self,
-        user_input: str
-    ):
-
+    def run(self, user_input):
 
         if not user_input:
-
             return None
-
-
-        if not isinstance(
-            user_input,
-            str
-        ):
-
-            return None
-
 
 
         try:
-
 
             set_status(
                 "Planning task"
             )
 
 
-            # =================================================
-            # CREATE TASK
-            # =================================================
-
-            task = (
-
-                self.task_manager.create_task(
-                    user_input
-                )
-
+            task = self.task_manager.create_task(
+                user_input
             )
 
 
-            task_id = None
-
-
-            if isinstance(
+            task_id = getattr(
                 task,
-                dict
-            ):
-
-                task_id = task.get(
-                    "id"
-                )
-
-            else:
-
-                task_id = getattr(
-                    task,
-                    "id",
-                    None
-                )
-
-
-
-            # =================================================
-            # CREATE PLAN
-            # =================================================
-
-            plan = (
-
-                self.planner.create_plan(
-                    user_input
-                )
-
+                "id",
+                None
             )
 
 
-            logger.info(
-                f"Agent plan: {plan}"
+            plan = self.planner.create_plan(
+                user_input
             )
-
 
 
             if not plan:
@@ -156,49 +90,15 @@ class AgentLoop:
 
 
 
-            # =================================================
-            # NORMALIZE PLAN
-            # =================================================
+            if isinstance(plan, dict):
 
-            if isinstance(
-                plan,
-                dict
-            ):
-
-                plan = [
-                    plan
-                ]
+                plan=[plan]
 
 
-            if not isinstance(
-                plan,
-                list
-            ):
+            results=[]
 
-                clear_status()
-
-                return None
-
-
-
-            results = []
-
-
-
-            # =================================================
-            # EXECUTE STEPS
-            # =================================================
 
             for step in plan:
-
-
-                if not isinstance(
-                    step,
-                    dict
-                ):
-
-                    continue
-
 
 
                 tool_name = step.get(
@@ -212,198 +112,58 @@ class AgentLoop:
                 )
 
 
-
-                if not tool_name:
-
-                    continue
-
-
-
-                query = self._extract_query(
-                    step,
+                query = step.get(
+                    "query",
                     user_input
                 )
 
 
+                if not tool_name:
+                    continue
+
 
                 set_status(
-                    "Running tools"
+                    f"Running {tool_name}"
                 )
 
 
+                future = executor.submit(
+                    self._execute_tool,
+                    tool_name,
+                    action,
+                    query
+                )
+
 
                 try:
 
-
-                    tool = (
-
-                        self.tool_manager
-                        .get_tool_by_name(
-                            tool_name
-                        )
-
+                    result = future.result(
+                        timeout=60
                     )
 
 
+                except TimeoutError:
 
-                    if not tool:
-
-
-                        result = (
-
-                            f"Tool '{tool_name}' "
-                            "not found."
-
-                        )
-
-
-
-                    elif hasattr(
-                        tool,
-                        "execute_action"
-                    ):
-
-
-                        result = (
-
-                            tool.execute_action(
-                                action,
-                                query
-                            )
-
-                        )
-
-
-
-                    elif hasattr(
-                        tool,
-                        "execute"
-                    ):
-
-
-                        result = (
-
-                            tool.execute(
-                                query
-                            )
-
-                        )
-
-
-
-                    else:
-
-
-                        result = (
-
-                            f"Tool '{tool_name}' "
-                            "cannot execute."
-
-                        )
-
-
-
-                    normalized = (
-
-                        self._normalize(
-                            result
-                        )
-
+                    result = (
+                        f"{tool_name} timed out."
                     )
-
-
-
-                    if normalized:
-
-
-                        results.append(
-                            normalized
-                        )
-
-
-
-                    # Update task
-
-                    if task_id:
-
-
-                        try:
-
-
-                            self.task_manager.update_task(
-
-                                task_id,
-
-                                step,
-
-                                normalized
-
-                            )
-
-
-                        except Exception as e:
-
-
-                            logger.warning(
-
-                                f"Task update failed: {e}"
-
-                            )
-
 
 
                 except Exception as e:
 
-
-                    logger.error(
-
-                        f"Tool execution error "
-                        f"({tool_name}): {e}"
-
+                    result = (
+                        f"Tool error: {e}"
                     )
 
+
+                if result:
 
                     results.append(
-
-                        f"Tool Error: {e}"
-
+                        str(result)
                     )
-
-
-
-            # =================================================
-            # COMPLETE TASK
-            # =================================================
-
-
-            if task_id:
-
-
-                try:
-
-
-                    self.task_manager.complete_task(
-
-                        task_id,
-
-                        results
-
-                    )
-
-
-                except Exception as e:
-
-
-                    logger.warning(
-
-                        f"Task completion failed: {e}"
-
-                    )
-
 
 
             clear_status()
-
 
 
             if not results:
@@ -411,150 +171,70 @@ class AgentLoop:
                 return None
 
 
-
-            return "\n".join(
-                results
-            )
+            return "\n".join(results)
 
 
 
         except Exception as e:
 
-
-            clear_status()
-
-
             logger.error(
-
-                f"Agent loop failed: {e}"
-
+                f"Agent failed: {e}"
             )
 
+            clear_status()
 
             return None
 
 
 
-    # =====================================================
-    # QUERY EXTRACTION
-    # =====================================================
+    # ==========================================
+    # TOOL EXECUTION
+    # ==========================================
 
-    def _extract_query(
+    def _execute_tool(
         self,
-        step,
-        fallback
+        tool_name,
+        action,
+        query
     ):
 
 
-        tool_input = step.get(
-            "input"
+        tool = (
+            self.tool_manager
+            .get_tool_by_name(
+                tool_name
+            )
         )
 
 
-        if isinstance(
-            tool_input,
-            dict
-        ):
-
+        if not tool:
 
             return (
-
-                tool_input.get(
-                    "query"
-                )
-
-                or
-
-                tool_input.get(
-                    "raw"
-                )
-
-                or
-
-                fallback
-
+                f"Tool {tool_name} not found."
             )
 
 
-
-        if isinstance(
-            tool_input,
-            str
+        if hasattr(
+            tool,
+            "execute_action"
         ):
 
-            return tool_input
+            return tool.execute_action(
+                action,
+                query
+            )
 
 
+        if hasattr(
+            tool,
+            "execute"
+        ):
 
-        return step.get(
-            "query",
-            fallback
+            return tool.execute(
+                query
+            )
+
+
+        return (
+            "Tool cannot execute."
         )
-
-
-
-    # =====================================================
-    # NORMALIZE OUTPUT
-    # =====================================================
-
-    def _normalize(
-        self,
-        output
-    ):
-
-
-        if output is None:
-
-            return ""
-
-
-
-        if isinstance(
-            output,
-            str
-        ):
-
-            return output
-
-
-
-        if isinstance(
-            output,
-            dict
-        ):
-
-
-            if "result" in output:
-
-                return str(
-                    output["result"]
-                )
-
-
-            if "message" in output:
-
-                return str(
-                    output["message"]
-                )
-
-
-            return str(output)
-
-
-
-        if isinstance(
-            output,
-            list
-        ):
-
-
-            return "\n".join(
-
-                str(item)
-
-                for item in output
-
-            )
-
-
-        return str(output)
