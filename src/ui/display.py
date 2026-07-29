@@ -12,6 +12,7 @@ import time
 from src.ui.status import (
     get_status,
     auto_clear_timeout
+    register_clear_callback
 )
 
 
@@ -28,8 +29,21 @@ class NexusDisplay:
 
         self.lock = threading.RLock()
 
+        
+        register_clear_callback(
+            self.clear_now
+        )
 
 
+    def clear_now(self):
+
+        self._clear_line()
+    
+        sys.stderr.write("\n")
+    
+        sys.stderr.flush()
+
+    
     def start(self):
 
         with self.lock:
