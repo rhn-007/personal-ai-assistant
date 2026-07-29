@@ -1,12 +1,13 @@
 """
 NEXUS Display Manager
 
-Stable Windows terminal animation.
+Stable terminal animation manager.
+Handles temporary status animations safely.
 """
 
+import sys
 import threading
 import time
-import sys
 
 from src.ui.status import get_status, auto_clear_timeout
 
@@ -14,22 +15,29 @@ from src.ui.status import get_status, auto_clear_timeout
 class NexusDisplay:
 
     def __init__(self):
+
         self.running = False
         self.thread = None
         self.current_line = False
+        self.lock = threading.RLock()
+
 
     def start(self):
-        if self.running:
-            return
 
-        self.running = True
+        with self.lock:
 
-        self.thread = threading.Thread(
-            target=self._loop,
-            daemon=True
-        )
+            if self.running:
+                return
 
-        self.thread.start()
+            self.running = True
+
+            self.thread = threading.Thread(
+                target=self._loop,
+                daemon=True
+            )
+
+            self.thread.start()
+
 
     def _frames(self, status):
 
@@ -42,33 +50,35 @@ class NexusDisplay:
                 "○──○──◉"
             ]
 
-        if "browser" in status:
+        if "running tools" in status:
             return [
-                "🌐 ○──○",
-                "🌐 ─○─",
-                "🌐 ○──◉"
+                "○──○──◉",
+                "○──◉──○",
+                "◉──○──○"
             ]
 
-        if "spotify" in status:
+        if "planning" in status:
             return [
-                "♫ ○──○",
-                "♫ ─○─",
-                "♫ ○──◉"
-            ]
-
-        if "email" in status:
-            return [
-                "✉ ○──○",
-                "✉ ─○─",
-                "✉ ○──◉"
+                "○──◉──○",
+                "◉──○──○",
+                "○──○──◉"
             ]
 
         if "thinking" in status:
+
             return [
                 "◉",
                 "◉.",
                 "◉..",
                 "◉..."
+            ]
+
+        if "search" in status:
+
+            return [
+                "○──○──◉",
+                "○──◉──○",
+                "◉──○──○"
             ]
 
         return [
@@ -77,12 +87,31 @@ class NexusDisplay:
             "◉──○──○"
         ]
 
+
     def _clear_line(self):
 
-        sys.stdout.write("\r" + (" " * 120) + "\r")
-        sys.stdout.flush()
+        if not self.current_line:
+            return
+
+        sys.stderr.write(
+            "\r" + (" " * 120) + "\r"
+        )
+
+        sys.stderr.flush()
 
         self.current_line = False
+
+
+    def _write(self, text):
+
+        sys.stderr.write(
+            "\r[NEXUS] " + text
+        )
+
+        sys.stderr.flush()
+
+        self.current_line = True
+
 
     def _loop(self):
 
@@ -91,63 +120,73 @@ class NexusDisplay:
 
         while self.running:
 
-            auto_clear_timeout()
+            try:
 
-            status = get_status()
+                auto_clear_timeout()
 
-            if not self.running:
-                break
+                status = get_status()
 
-            if not status:
 
-                if self.current_line:
+                if not status:
+
                     self._clear_line()
 
-                last_status = None
-                index = 0
+                    index = 0
+                    last_status = None
 
-                time.sleep(0.05)
-                continue
+                    time.sleep(0.1)
 
-            if status != last_status:
+                    continue
+
+
+                if status != last_status:
+
+                    self._clear_line()
+
+                    index = 0
+
+
+                frames = self._frames(status)
+
+                frame = frames[
+                    index % len(frames)
+                ]
+
+
+                self._write(
+                    f"{frame} {status}..."
+                )
+
+
+                index += 1
+
+                last_status = status
+
+
+                time.sleep(0.35)
+
+
+            except Exception:
 
                 self._clear_line()
 
-                last_status = status
-                index = 0
+                time.sleep(0.2)
 
-            frames = self._frames(status)
 
-            frame = frames[index % len(frames)]
-
-            sys.stdout.write(
-                f"\r[NEXUS] {frame} {status}..."
-            )
-
-            sys.stdout.flush()
-
-            self.current_line = True
-
-            index += 1
-
-            for _ in range(6):
-
-                if not self.running:
-                    break
-
-                if get_status() != status:
-                    break
-
-                time.sleep(0.05)
-
-        self._clear_line()
 
     def stop(self):
 
-        self.running = False
+        with self.lock:
 
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1)
+            self.running = False
+
+
+        if self.thread:
+
+            self.thread.join(
+                timeout=1
+            )
+
 
         self._clear_line()
 
