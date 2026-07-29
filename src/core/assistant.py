@@ -339,65 +339,86 @@ class PersonalAssistant:
         self,
         user_input: str
     ):
-
+    
         try:
-
+    
             set_status(
                 "Running tools"
             )
-
-
+    
+            result = self.tool_manager.execute(
+                user_input
+            )
+    
             if not result:
+    
                 return None
-
+    
+    
             if not result.get(
                 "handled"
             ):
+    
                 return None
-
+    
+    
             return result.get(
                 "result"
             )
-
+    
+    
         except Exception as e:
-
-            clear_status()
-
+    
+    
             self.logger.error(
                 f"Tool execution error: {e}"
             )
-
-            return None
-
     
-    def _run_agent_loop(
+            return None
+    
+    
+        finally:
+    
+            clear_status()
+    
+   def _run_agent_loop(
         self,
         user_input: str
     ):
-
+    
         try:
-
+    
             set_status(
                 "Planning task"
             )
-
+    
+    
             if not self.agent_loop:
-                clear_status()
+    
                 return None
-
-
+    
+    
+            result = self.agent_loop.run(
+                user_input
+            )
+    
+    
             return result
-
+    
+    
         except Exception as e:
-
-            clear_status()
-
+    
+    
             self.logger.error(
                 f"Agent loop error: {e}"
             )
-
+    
             return None
-
+    
+    
+        finally:
+    
+            clear_status()
 
     def process_input(
         self,
