@@ -47,6 +47,15 @@ class SystemTool:
                 r"C:\Program Files (x86)\Opera\launcher.exe"
             ],
 
+            # WHATSAPP
+            "whatsapp": [
+
+                r"C:\Users\%USERNAME%\AppData\Local\WhatsApp\WhatsApp.exe",
+            
+                r"C:\Program Files\WindowsApps\5319275A.WhatsAppDesktop_*\WhatsApp.exe"
+            
+            ],
+
             # SPOTIFY
             "spotify": [
 
