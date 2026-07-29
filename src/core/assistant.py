@@ -380,8 +380,8 @@ class PersonalAssistant:
         finally:
     
             clear_status()
-    
-   def _run_agent_loop(
+            
+    def _run_agent_loop(
         self,
         user_input: str
     ):
@@ -419,6 +419,7 @@ class PersonalAssistant:
         finally:
     
             clear_status()
+   
 
     def process_input(
         self,
