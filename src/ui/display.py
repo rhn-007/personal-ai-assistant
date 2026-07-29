@@ -221,6 +221,14 @@ class NexusDisplay:
     # =====================================================
 
 
+
+    def clear_now(self):
+
+        self._clear_line()
+    
+        sys.stderr.write("\n")
+        sys.stderr.flush()
+    
     def stop(self):
 
 
@@ -254,3 +262,5 @@ class NexusDisplay:
 
 
         self.thread = None
+
+
