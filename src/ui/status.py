@@ -9,6 +9,7 @@ import threading
 import time
 
 
+_clear_callback = None
 
 _current_status = None
 
@@ -35,6 +36,12 @@ def set_status(status: str):
         _status_start_time = time.time()
 
 
+def register_clear_callback(callback):
+
+    global _clear_callback
+
+    _clear_callback = callback
+
 
 def get_status():
 
@@ -49,13 +56,22 @@ def clear_status():
     global _current_status
     global _status_start_time
 
-
     with _status_lock:
 
         _current_status = None
 
         _status_start_time = None
 
+
+    if _clear_callback:
+
+        try:
+
+            _clear_callback()
+
+        except Exception:
+
+            pass
 
 
 def is_active():
