@@ -64,16 +64,20 @@ Do not mention internal programming unless asked.
     # NORMAL RESPONSE
     # =========================================================
 
-    def generate_response(
+   def generate_response(
         self,
         user_input: str,
         context=None
     ) -> str:
     
+        import time
+    
+        start_time = time.time()
+    
         try:
     
             logger.info(
-                "Sending request to Ollama..."
+                "Preparing Ollama request..."
             )
     
             messages = [
@@ -90,14 +94,25 @@ Do not mention internal programming unless asked.
     
                 for message in context:
     
-                    if not isinstance(message, dict):
+                    if not isinstance(
+                        message,
+                        dict
+                    ):
                         continue
     
-                    role = message.get("role")
-                    content = message.get("content")
+    
+                    role = message.get(
+                        "role"
+                    )
+    
+                    content = message.get(
+                        "content"
+                    )
+    
     
                     if not role or not content:
                         continue
+    
     
                     messages.append(
                         {
@@ -115,6 +130,11 @@ Do not mention internal programming unless asked.
             )
     
     
+            logger.info(
+                f"Sending request to Ollama ({len(messages)} messages)"
+            )
+    
+    
             response = ollama.chat(
     
                 model=self.model,
@@ -123,44 +143,58 @@ Do not mention internal programming unless asked.
     
                 options={
     
-                    "temperature": 0.3,
+                    "temperature":0.3,
     
-                    "num_ctx": 4096
+                    "num_ctx":4096
     
                 }
     
             )
     
     
+            elapsed = (
+                time.time()
+                -
+                start_time
+            )
+    
+    
             logger.info(
-                "Ollama response received."
+                f"Ollama completed in {elapsed:.2f}s"
             )
     
     
             if not response:
     
-                return "I could not generate a response."
+                return (
+                    "No response received."
+                )
     
     
-            message = response.get(
-                "message",
-                {}
-            )
+            content = (
     
+                response
+                .get(
+                    "message",
+                    {}
+                )
+                .get(
+                    "content",
+                    ""
+                )
     
-            content = message.get(
-                "content"
             )
     
     
             if not content:
     
                 return (
-                    "The AI returned an empty response."
+                    "Empty response received."
                 )
     
     
             return content.strip()
+    
     
     
         except Exception as e:
@@ -172,8 +206,7 @@ Do not mention internal programming unless asked.
     
     
             return (
-                "I encountered an error while "
-                "generating a response."
+                f"Ollama error: {e}"
             )
     # =========================================================
     # MEMORY ANALYSIS
