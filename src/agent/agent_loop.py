@@ -2,22 +2,24 @@
 NEXUS Agent Loop
 
 Handles:
-- Task creation
-- Planner execution
-- Tool execution
-- Task updates
+- Complex task execution
+- Planner-based workflows
+- Multi-step tool execution
+- Task tracking
 - Result normalization
 
-Compatible with both:
-- Dictionary based planner output
-- List based planner output
+Simple commands should be handled by ToolManager first.
+AgentLoop is used as a secondary execution layer.
 """
+
 
 from src.planner.planner import Planner
 from src.tools.tool_manager import ToolManager
 from src.agent.task_manager import TaskManager
 
 from src.utils.logger import setup_logger
+
+from src.ui.status import set_status, clear_status
 
 
 logger = setup_logger(__name__)
@@ -27,18 +29,15 @@ class AgentLoop:
 
 
     def __init__(
-
         self,
-
         tool_manager: ToolManager,
-
         planner: Planner = None,
-
         task_manager: TaskManager = None
-
     ):
 
+
         self.tool_manager = tool_manager
+
 
         self.planner = (
 
@@ -49,6 +48,7 @@ class AgentLoop:
             else Planner(tool_manager)
 
         )
+
 
         self.task_manager = (
 
@@ -67,23 +67,19 @@ class AgentLoop:
     # =====================================================
 
     def run(
-
         self,
-
         user_input: str
-
     ):
 
 
-        if (
+        if not user_input:
 
-            not user_input
+            return None
 
-            or not isinstance(
-                user_input,
-                str
-            )
 
+        if not isinstance(
+            user_input,
+            str
         ):
 
             return None
@@ -92,9 +88,15 @@ class AgentLoop:
 
         try:
 
-            # ---------------------------------------------
+
+            set_status(
+                "Planning task"
+            )
+
+
+            # =================================================
             # CREATE TASK
-            # ---------------------------------------------
+            # =================================================
 
             task = (
 
@@ -127,9 +129,9 @@ class AgentLoop:
 
 
 
-            # ---------------------------------------------
+            # =================================================
             # CREATE PLAN
-            # ---------------------------------------------
+            # =================================================
 
             plan = (
 
@@ -148,28 +150,15 @@ class AgentLoop:
 
             if not plan:
 
+                clear_status()
+
                 return None
 
 
 
-            # ---------------------------------------------
+            # =================================================
             # NORMALIZE PLAN
-            #
-            # Planner may return:
-            #
-            # {
-            #   tool:"system",
-            #   action:"open"
-            # }
-            #
-            # OR
-            #
-            # [
-            #   {...}
-            # ]
-            #
-            # ---------------------------------------------
-
+            # =================================================
 
             if isinstance(
                 plan,
@@ -177,9 +166,7 @@ class AgentLoop:
             ):
 
                 plan = [
-
                     plan
-
                 ]
 
 
@@ -187,6 +174,8 @@ class AgentLoop:
                 plan,
                 list
             ):
+
+                clear_status()
 
                 return None
 
@@ -196,9 +185,9 @@ class AgentLoop:
 
 
 
-            # ---------------------------------------------
+            # =================================================
             # EXECUTE STEPS
-            # ---------------------------------------------
+            # =================================================
 
             for step in plan:
 
@@ -223,48 +212,23 @@ class AgentLoop:
                 )
 
 
+
                 if not tool_name:
 
                     continue
 
 
 
-                # -----------------------------------------
-                # GET QUERY
-                # -----------------------------------------
-
-                tool_input = step.get(
-                    "input",
+                query = self._extract_query(
+                    step,
                     user_input
                 )
 
 
-                if isinstance(
-                    tool_input,
-                    dict
-                ):
 
-                    query = (
-
-                        tool_input.get(
-                            "raw"
-                        )
-
-                        or
-
-                        tool_input.get(
-                            "query"
-                        )
-
-                        or
-
-                        user_input
-
-                    )
-
-                else:
-
-                    query = tool_input
+                set_status(
+                    "Running tools"
+                )
 
 
 
@@ -281,6 +245,7 @@ class AgentLoop:
                     )
 
 
+
                     if not tool:
 
 
@@ -292,34 +257,27 @@ class AgentLoop:
                         )
 
 
+
                     elif hasattr(
-
                         tool,
-
                         "execute_action"
-
                     ):
 
 
                         result = (
 
                             tool.execute_action(
-
                                 action,
-
                                 query
-
                             )
 
                         )
 
 
+
                     elif hasattr(
-
                         tool,
-
                         "execute"
-
                     ):
 
 
@@ -330,6 +288,7 @@ class AgentLoop:
                             )
 
                         )
+
 
 
                     else:
@@ -353,6 +312,7 @@ class AgentLoop:
                     )
 
 
+
                     if normalized:
 
 
@@ -369,6 +329,7 @@ class AgentLoop:
 
                         try:
 
+
                             self.task_manager.update_task(
 
                                 task_id,
@@ -381,6 +342,7 @@ class AgentLoop:
 
 
                         except Exception as e:
+
 
                             logger.warning(
 
@@ -395,33 +357,30 @@ class AgentLoop:
 
                     logger.error(
 
-                        f"Agent tool execution error "
+                        f"Tool execution error "
                         f"({tool_name}): {e}"
 
                     )
 
 
-                    error = (
-
-                        f"Tool Error: {str(e)}"
-
-                    )
-
-
                     results.append(
-                        error
+
+                        f"Tool Error: {e}"
+
                     )
 
 
 
-            # ---------------------------------------------
+            # =================================================
             # COMPLETE TASK
-            # ---------------------------------------------
+            # =================================================
+
 
             if task_id:
 
 
                 try:
+
 
                     self.task_manager.complete_task(
 
@@ -443,6 +402,10 @@ class AgentLoop:
 
 
 
+            clear_status()
+
+
+
             if not results:
 
                 return None
@@ -458,6 +421,9 @@ class AgentLoop:
         except Exception as e:
 
 
+            clear_status()
+
+
             logger.error(
 
                 f"Agent loop failed: {e}"
@@ -470,15 +436,70 @@ class AgentLoop:
 
 
     # =====================================================
+    # QUERY EXTRACTION
+    # =====================================================
+
+    def _extract_query(
+        self,
+        step,
+        fallback
+    ):
+
+
+        tool_input = step.get(
+            "input"
+        )
+
+
+        if isinstance(
+            tool_input,
+            dict
+        ):
+
+
+            return (
+
+                tool_input.get(
+                    "query"
+                )
+
+                or
+
+                tool_input.get(
+                    "raw"
+                )
+
+                or
+
+                fallback
+
+            )
+
+
+
+        if isinstance(
+            tool_input,
+            str
+        ):
+
+            return tool_input
+
+
+
+        return step.get(
+            "query",
+            fallback
+        )
+
+
+
+    # =====================================================
     # NORMALIZE OUTPUT
     # =====================================================
 
     def _normalize(
-
         self,
-
         output
-
     ):
 
 
@@ -534,7 +555,6 @@ class AgentLoop:
                 for item in output
 
             )
-
 
 
         return str(output)
