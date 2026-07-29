@@ -346,13 +346,6 @@ class PersonalAssistant:
                 "Running tools"
             )
 
-            result = (
-                self.tool_manager.execute(
-                    user_input
-                )
-            )
-
-            clear_status()
 
             if not result:
                 return None
@@ -392,11 +385,6 @@ class PersonalAssistant:
                 clear_status()
                 return None
 
-            result = self.agent_loop.run(
-                user_input
-            )
-
-            clear_status()
 
             return result
 
@@ -445,7 +433,6 @@ class PersonalAssistant:
 
             if tool_result:
 
-                clear_status()
 
                 self.status = "READY"
 
@@ -458,7 +445,6 @@ class PersonalAssistant:
 
             if agent_result:
 
-                clear_status()
 
                 self.status = "READY"
 
@@ -476,7 +462,6 @@ class PersonalAssistant:
                     user_input
                 )
 
-                clear_status()
 
                 self.status = "READY"
 
@@ -548,7 +533,6 @@ Interests:
             )
 
 
-            clear_status()
 
 
             self.conversation.add_exchange(
@@ -564,7 +548,6 @@ Interests:
 
         except Exception as e:
 
-            clear_status()
 
             self.status = "ERROR"
 
@@ -573,8 +556,10 @@ Interests:
             )
 
             return f"Error: {str(e)}"
-
-
+            
+        finally:
+            
+            clear_status()
 
     def _is_email_query(
         self,
