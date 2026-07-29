@@ -512,6 +512,8 @@ class Planner:
 
             "paint",
 
+            "whatsapp",
+
             "spotify",
 
             "opera",
