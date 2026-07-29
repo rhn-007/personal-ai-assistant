@@ -69,126 +69,112 @@ Do not mention internal programming unless asked.
         user_input: str,
         context=None
     ) -> str:
-
+    
         try:
-
+    
+            logger.info(
+                "Sending request to Ollama..."
+            )
+    
             messages = [
-
+    
                 {
                     "role": "system",
-
                     "content": self.system_prompt
-
                 }
-
+    
             ]
-
+    
+    
             if context:
-
+    
                 for message in context:
-
-                    if not isinstance(
-                        message,
-                        dict
-                    ):
-
+    
+                    if not isinstance(message, dict):
                         continue
-
-                    role = message.get(
-                        "role"
-                    )
-
-                    content = message.get(
-                        "content"
-                    )
-
+    
+                    role = message.get("role")
+                    content = message.get("content")
+    
                     if not role or not content:
-
                         continue
-
-                    if (
-
-                        role == "system"
-
-                        and content == self.system_prompt
-
-                    ):
-
-                        continue
-
-                    messages.append({
-
-                        "role": role,
-
-                        "content": content
-
-                    })
-
-            messages.append({
-
-                "role": "user",
-
-                "content": user_input
-
-            })
-
-            response = ollama.chat(
-
-                model=self.model,
-
-                messages=messages,
-
-                options={
-
-                    "temperature": 0.3,
-
-                    "num_ctx": 4096
-
+    
+                    messages.append(
+                        {
+                            "role": role,
+                            "content": content
+                        }
+                    )
+    
+    
+            messages.append(
+                {
+                    "role": "user",
+                    "content": user_input
                 }
-
             )
-
+    
+    
+            response = ollama.chat(
+    
+                model=self.model,
+    
+                messages=messages,
+    
+                options={
+    
+                    "temperature": 0.3,
+    
+                    "num_ctx": 4096
+    
+                }
+    
+            )
+    
+    
+            logger.info(
+                "Ollama response received."
+            )
+    
+    
             if not response:
-
-                return (
-                    "I was unable to generate "
-                    "a response."
-                )
-
+    
+                return "I could not generate a response."
+    
+    
             message = response.get(
-                "message"
+                "message",
+                {}
             )
-
-            if not message:
-
-                return (
-                    "I was unable to generate "
-                    "a response."
-                )
-
+    
+    
             content = message.get(
                 "content"
             )
-
+    
+    
             if not content:
-
+    
                 return (
-                    "I received an empty response "
-                    "from the local AI model."
+                    "The AI returned an empty response."
                 )
-
+    
+    
             return content.strip()
-
+    
+    
         except Exception as e:
-
+    
+    
             logger.error(
-                f"Ollama response error: {e}"
+                f"Ollama generation failed: {e}"
             )
-
+    
+    
             return (
-                f"Ollama error: {str(e)}"
+                "I encountered an error while "
+                "generating a response."
             )
-
     # =========================================================
     # MEMORY ANALYSIS
     # =========================================================
