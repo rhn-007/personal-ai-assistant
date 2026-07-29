@@ -1,21 +1,23 @@
 """
 NEXUS Display Manager
 
-Stable terminal animation manager.
+Single-owner terminal animation system.
 
-Features:
-- Single universal pulse animation
-- Thread-safe rendering
-- Immediate clearing
-- Prevents frozen status lines
-- Does not interfere with user input
+Responsibilities:
+- Render assistant status animation
+- Read status.py state
+- Avoid terminal conflicts
+- Handle clean startup/shutdown
 """
 
 import sys
 import threading
 import time
 
-from src.ui.status import get_status, auto_clear_timeout
+from src.ui.status import (
+    get_status,
+    auto_clear_timeout
+)
 
 
 class NexusDisplay:
@@ -23,15 +25,17 @@ class NexusDisplay:
     def __init__(self):
 
         self.running = False
-        self.thread = None
 
-        self.current_line = False
+        self.thread = None
 
         self.lock = threading.RLock()
 
+        self.line_visible = False
+
+
 
     # =====================================================
-    # START DISPLAY THREAD
+    # START DISPLAY ENGINE
     # =====================================================
 
     def start(self):
@@ -43,70 +47,85 @@ class NexusDisplay:
 
             self.running = True
 
+
             self.thread = threading.Thread(
+
                 target=self._loop,
+
                 daemon=True
+
             )
+
 
             self.thread.start()
 
 
 
     # =====================================================
-    # UNIVERSAL PULSE ANIMATION
+    # ANIMATION FRAMES
     # =====================================================
 
     def _frames(self):
 
         return [
-    
+
             "○──○──●",
+
             "○──●──○",
+
             "●──○──○",
+
             "○──●──○"
-    
+
         ]
 
 
 
     # =====================================================
-    # WRITE STATUS LINE
+    # WRITE LINE
     # =====================================================
 
-    def _write(self, text):
+    def _render(self, text):
 
         with self.lock:
 
-            sys.stderr.write(
+            sys.stdout.write(
+
                 "\r[NEXUS] " + text
+
             )
 
-            sys.stderr.flush()
+            sys.stdout.flush()
 
-            self.current_line = True
+
+            self.line_visible = True
 
 
 
     # =====================================================
-    # CLEAR CURRENT LINE
+    # CLEAR LINE
     # =====================================================
 
     def clear_now(self):
 
         with self.lock:
 
-            if not self.current_line:
+            if not self.line_visible:
+
                 return
 
 
-            sys.stderr.write(
+            sys.stdout.write(
+
                 "\r" + (" " * 120) + "\r"
+
             )
 
-            sys.stderr.flush()
+
+            sys.stdout.flush()
 
 
-            self.current_line = False
+            self.line_visible = False
 
 
 
@@ -116,10 +135,13 @@ class NexusDisplay:
 
     def _loop(self):
 
+        frames = self._frames()
+
         index = 0
 
 
         while self.running:
+
 
             try:
 
@@ -129,13 +151,13 @@ class NexusDisplay:
                 status = get_status()
 
 
-                # No active status
 
                 if not status:
 
                     self.clear_now()
 
                     index = 0
+
 
                     time.sleep(
                         0.05
@@ -145,15 +167,14 @@ class NexusDisplay:
 
 
 
-                frames = self._frames()
-
-
                 frame = frames[
+
                     index % len(frames)
+
                 ]
 
 
-                self._write(
+                self._render(
 
                     f"{frame} {status}..."
 
@@ -164,12 +185,12 @@ class NexusDisplay:
 
 
                 time.sleep(
-                    0.35
+                    0.30
                 )
 
 
 
-            except Exception as e:
+            except Exception:
 
 
                 self.clear_now()
@@ -182,7 +203,7 @@ class NexusDisplay:
 
 
     # =====================================================
-    # STOP DISPLAY
+    # STOP
     # =====================================================
 
     def stop(self):
