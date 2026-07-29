@@ -10,6 +10,7 @@ Provides:
 """
 
 import json
+import time
 
 import ollama
 
@@ -20,6 +21,7 @@ logger = setup_logger(__name__)
 
 
 class OllamaIntegration:
+
 
     def __init__(
         self,
@@ -60,119 +62,144 @@ Do not mention internal programming unless asked.
 
 """
 
+
     # =========================================================
     # NORMAL RESPONSE
     # =========================================================
 
-   def generate_response(
+
+    def generate_response(
         self,
         user_input: str,
         context=None
     ) -> str:
-    
-        import time
-    
+
+
         start_time = time.time()
-    
+
+
         try:
-    
+
+
             logger.info(
                 "Preparing Ollama request..."
             )
-    
+
+
             messages = [
-    
+
                 {
                     "role": "system",
                     "content": self.system_prompt
                 }
-    
+
             ]
-    
-    
+
+
             if context:
-    
+
+
                 for message in context:
-    
+
+
                     if not isinstance(
                         message,
                         dict
                     ):
+
                         continue
-    
-    
+
+
                     role = message.get(
                         "role"
                     )
-    
+
+
                     content = message.get(
                         "content"
                     )
-    
-    
+
+
                     if not role or not content:
+
                         continue
-    
-    
+
+
                     messages.append(
+
                         {
                             "role": role,
                             "content": content
                         }
+
                     )
-    
-    
+
+
+
             messages.append(
+
                 {
                     "role": "user",
                     "content": user_input
                 }
+
             )
-    
-    
+
+
+
             logger.info(
-                f"Sending request to Ollama ({len(messages)} messages)"
+
+                f"Sending request to Ollama "
+                f"({len(messages)} messages)"
+
             )
-    
-    
+
+
+
             response = ollama.chat(
-    
+
                 model=self.model,
-    
+
                 messages=messages,
-    
+
                 options={
-    
-                    "temperature":0.3,
-    
-                    "num_ctx":4096
-    
+
+                    "temperature": 0.3,
+
+                    "num_ctx": 4096
+
                 }
-    
+
             )
-    
-    
+
+
+
             elapsed = (
                 time.time()
                 -
                 start_time
             )
-    
-    
+
+
             logger.info(
-                f"Ollama completed in {elapsed:.2f}s"
+
+                f"Ollama completed in "
+                f"{elapsed:.2f}s"
+
             )
-    
-    
+
+
+
             if not response:
-    
+
                 return (
                     "No response received."
                 )
-    
-    
+
+
+
             content = (
-    
+
                 response
                 .get(
                     "message",
@@ -182,35 +209,45 @@ Do not mention internal programming unless asked.
                     "content",
                     ""
                 )
-    
+
             )
-    
-    
+
+
+
             if not content:
-    
+
                 return (
                     "Empty response received."
                 )
-    
-    
+
+
+
             return content.strip()
-    
-    
-    
+
+
+
         except Exception as e:
-    
-    
+
+
             logger.error(
+
                 f"Ollama generation failed: {e}"
+
             )
-    
-    
+
+
             return (
+
                 f"Ollama error: {e}"
+
             )
+
+
+
     # =========================================================
     # MEMORY ANALYSIS
     # =========================================================
+
 
     def analyze_memory(
         self,
@@ -218,15 +255,16 @@ Do not mention internal programming unless asked.
         memory_snapshot: dict
     ) -> dict:
 
-        """
-        Uses Ollama to select only memory relevant
-        to the user's current question.
-        """
 
         memory_json = json.dumps(
+
             memory_snapshot,
+
             ensure_ascii=False
+
         )
+
+
 
         prompt = f"""
 
@@ -268,7 +306,10 @@ Use exactly this structure:
 
 """
 
+
+
         try:
+
 
             response = ollama.chat(
 
@@ -276,18 +317,19 @@ Use exactly this structure:
 
                 messages=[
 
+
                     {
 
                         "role": "system",
 
-                        "content": (
+                        "content":
 
                             "You are a precise memory "
                             "retrieval engine. "
                             "Return only valid JSON."
-                        )
 
                     },
+
 
                     {
 
@@ -297,9 +339,12 @@ Use exactly this structure:
 
                     }
 
+
                 ],
 
+
                 format="json",
+
 
                 options={
 
@@ -311,31 +356,29 @@ Use exactly this structure:
 
             )
 
+
+
             content = (
 
                 response
-
                 .get(
-
                     "message",
-
                     {}
-
                 )
-
                 .get(
-
                     "content",
-
                     "{}"
-
                 )
 
             )
+
+
 
             result = json.loads(
                 content
             )
+
+
 
             if not isinstance(
                 result,
@@ -344,21 +387,33 @@ Use exactly this structure:
 
                 return {}
 
+
+
             return result
+
+
 
         except Exception as e:
 
+
             logger.error(
+
                 f"Memory analysis error: {e}"
+
             )
 
+
             return {}
+
+
 
     # =========================================================
     # STATUS
     # =========================================================
 
+
     def get_status(self):
+
 
         try:
 
@@ -366,6 +421,8 @@ Use exactly this structure:
 
             return "ONLINE"
 
+
         except Exception:
+
 
             return "OFFLINE"
