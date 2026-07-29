@@ -6,21 +6,23 @@ logger = setup_logger(__name__)
 
 class ToolManager:
     """
-    Unified Tool Manager
+    NEXUS Tool Manager
 
     Responsibilities:
     - Register tools
-    - Route queries using the Planner
+    - Use Planner for routing
     - Execute tools safely
-    - Support action-based execution
+    - Support action-based tools
     """
+
 
     def __init__(self):
 
         self.tools = {}
 
-        # Planner is attached later
         self.planner = None
+
+
 
     # =====================================================
     # REGISTER TOOL
@@ -31,19 +33,24 @@ class ToolManager:
         if not tool:
             return
 
+
         if not hasattr(tool, "name"):
 
             logger.warning(
-                "Attempted to register invalid tool."
+                "Invalid tool registration attempt."
             )
 
             return
 
+
         self.tools[tool.name] = tool
+
 
         logger.info(
             f"Registered tool: {tool.name}"
         )
+
+
 
     # =====================================================
     # SET PLANNER
@@ -53,24 +60,32 @@ class ToolManager:
 
         self.planner = planner
 
+
         logger.info(
-            "Planner attached to ToolManager."
+            "Planner attached."
         )
+
+
 
     # =====================================================
     # GET TOOL
     # =====================================================
 
-    def get_tool_by_name(self, name):
-
-        return self.get_tool(name)
-
-    def get_tool(self, name: str):
+    def get_tool(self, name):
 
         if not name:
             return None
 
+
         return self.tools.get(name)
+
+
+
+    def get_tool_by_name(self, name):
+
+        return self.get_tool(name)
+
+
 
     # =====================================================
     # GET PLAN
@@ -81,33 +96,32 @@ class ToolManager:
         if not self.planner:
             return None
 
+
         try:
 
-            plan = self.planner.create_plan(query)
+            plan = self.planner.create_plan(
+                query
+            )
+
 
             if not plan:
                 return None
 
-            # ---------------------------------------------
-            # SUPPORT SINGLE DICTIONARY PLAN
-            # ---------------------------------------------
 
             if isinstance(plan, dict):
 
                 return plan
 
-            # ---------------------------------------------
-            # SUPPORT LIST PLAN
-            # ---------------------------------------------
 
             if isinstance(plan, list):
 
-                if len(plan) == 0:
-                    return None
+                if len(plan) > 0:
 
-                return plan[0]
+                    return plan[0]
+
 
             return None
+
 
         except Exception as e:
 
@@ -117,62 +131,13 @@ class ToolManager:
 
             return None
 
-    # =====================================================
-    # ROUTE QUERY TO TOOL
-    # =====================================================
 
-    def route(self, query: str):
-
-        if not query:
-            return None
-
-        # -------------------------------------------------
-        # PLANNER FIRST
-        # -------------------------------------------------
-
-        plan = self._get_plan(query)
-
-        if plan:
-
-            tool_name = plan.get("tool")
-
-            tool = self.get_tool(tool_name)
-
-            if tool:
-                return tool
-
-        # -------------------------------------------------
-        # FALLBACK TO can_handle()
-        # -------------------------------------------------
-
-        for tool in self.tools.values():
-
-            try:
-
-                if (
-
-                    hasattr(tool, "can_handle")
-
-                    and tool.can_handle(query)
-
-                ):
-
-                    return tool
-
-            except Exception as e:
-
-                logger.error(
-                    f"Tool check error "
-                    f"({tool.name}): {e}"
-                )
-
-        return None
 
     # =====================================================
     # MAIN EXECUTION
     # =====================================================
 
-    def execute(self, query: str):
+    def execute(self, query):
 
         if not query:
 
@@ -182,184 +147,152 @@ class ToolManager:
                 "result": None
             }
 
-        # -------------------------------------------------
-        # GET PLAN
-        # -------------------------------------------------
 
-        plan = self._get_plan(query)
 
-        if plan:
+        plan = self._get_plan(
+            query
+        )
 
-            tool_name = plan.get("tool")
 
-            action = plan.get("action")
-
-            # ---------------------------------------------
-            # GET INPUT
-            # ---------------------------------------------
-
-            tool_input = plan.get(
-                "input",
-                {}
-            )
-
-            # ---------------------------------------------
-            # QUERY EXTRACTION
-            # ---------------------------------------------
-
-            tool_query = query
-
-            if isinstance(tool_input, dict):
-
-                tool_query = tool_input.get(
-                    "query",
-                    query
-                )
-
-            # ---------------------------------------------
-            # DIRECT QUERY FROM PLAN
-            # ---------------------------------------------
-
-            if plan.get("query"):
-
-                tool_query = plan.get(
-                    "query"
-                )
-
-            tool = self.get_tool(
-                tool_name
-            )
-
-            if tool:
-
-                logger.info(
-                    f"Planner selected: "
-                    f"{tool_name} | "
-                    f"Action: {action}"
-                )
-
-                return self.execute_by_name(
-
-                    name=tool_name,
-
-                    action=action,
-
-                    query=tool_query
-
-                )
-
-        # -------------------------------------------------
-        # FALLBACK ROUTING
-        # -------------------------------------------------
-
-        tool = self.route(query)
-
-        if not tool:
+        if not plan:
 
             return {
-
                 "handled": False,
-
                 "tool": None,
-
                 "result": None
-
             }
 
-        try:
 
-            logger.info(
 
-                f"Executing tool: "
-                f"{tool.name}"
+        tool_name = plan.get(
+            "tool"
+        )
 
-            )
 
-            result = tool.execute(query)
+        action = plan.get(
+            "action",
+            "default"
+        )
+
+
+        if not tool_name:
 
             return {
-
-                "handled": True,
-
-                "tool": tool.name,
-
-                "result": result
-
+                "handled": False,
+                "tool": None,
+                "result": None
             }
 
-        except Exception as e:
 
-            logger.error(
 
-                f"Tool execution failed "
-                f"({tool.name}): {e}"
+        tool = self.get_tool(
+            tool_name
+        )
 
-            )
-
-            return {
-
-                "handled": True,
-
-                "tool": tool.name,
-
-                "result": f"Tool Error: {e}"
-
-            }
-
-    # =====================================================
-    # ACTION-BASED EXECUTION
-    # =====================================================
-
-    def execute_by_name(
-
-        self,
-
-        name,
-
-        action,
-
-        query=None
-
-    ):
-
-        tool = self.get_tool_by_name(name)
 
         if not tool:
 
             logger.warning(
-                f"Tool not found: {name}"
+                f"Tool not found: {tool_name}"
             )
+
+
+            return {
+                "handled": True,
+                "tool": tool_name,
+                "result": (
+                    f"Tool '{tool_name}' "
+                    "not found."
+                )
+            }
+
+
+
+        # Extract query
+
+        tool_query = query
+
+
+        if plan.get("query"):
+
+            tool_query = plan.get(
+                "query"
+            )
+
+
+        elif isinstance(
+            plan.get("input"),
+            dict
+        ):
+
+            tool_query = (
+
+                plan["input"].get(
+                    "query"
+                )
+
+                or query
+
+            )
+
+
+
+        return self.execute_by_name(
+
+            tool_name,
+
+            action,
+
+            tool_query
+
+        )
+
+
+
+    # =====================================================
+    # ACTION EXECUTION
+    # =====================================================
+
+    def execute_by_name(
+        self,
+        name,
+        action,
+        query=None
+    ):
+
+
+        tool = self.get_tool(
+            name
+        )
+
+
+        if not tool:
 
             return {
 
-                "handled": False,
+                "handled": True,
 
                 "tool": name,
 
-                "result": None
+                "result": (
+                    f"Tool '{name}' "
+                    "not found."
+                )
 
             }
+
+
 
         try:
 
             logger.info(
-
-                f"Executing tool: "
-                f"{name} | "
-                f"Action: {action}"
-
+                f"Executing tool: {name} | Action: {action}"
             )
 
-            # ---------------------------------------------
-            # ACTION-AWARE TOOL
-            # ---------------------------------------------
 
             if hasattr(
-
                 tool,
-
                 "execute_action"
-
             ):
 
                 result = tool.execute_action(
@@ -370,13 +303,31 @@ class ToolManager:
 
                 )
 
-            # ---------------------------------------------
-            # STANDARD TOOL
-            # ---------------------------------------------
+
+            elif hasattr(
+                tool,
+                "execute"
+            ):
+
+                result = tool.execute(
+                    query
+                )
+
 
             else:
 
-                result = tool.execute(query)
+                result = (
+                    f"Tool '{name}' "
+                    "cannot execute."
+                )
+
+
+
+            logger.info(
+                f"Tool result: {result}"
+            )
+
+
 
             return {
 
@@ -388,14 +339,15 @@ class ToolManager:
 
             }
 
+
+
         except Exception as e:
 
+
             logger.error(
-
-                f"Tool execution failed "
-                f"({name}): {e}"
-
+                f"Tool execution failed ({name}): {e}"
             )
+
 
             return {
 
@@ -403,76 +355,110 @@ class ToolManager:
 
                 "tool": name,
 
-                "result": f"Tool Error: {e}"
+                "result": (
+                    f"Tool Error: {e}"
+                )
 
             }
 
+
+
     # =====================================================
-    # EXECUTE PLAN
+    # OPTIONAL FALLBACK ROUTING
+    # =====================================================
+
+    def route(self, query):
+
+        if not query:
+            return None
+
+
+        for tool in self.tools.values():
+
+            try:
+
+                if hasattr(
+                    tool,
+                    "can_handle"
+                ):
+
+                    if tool.can_handle(query):
+
+                        return tool
+
+
+            except Exception as e:
+
+                logger.error(
+                    f"Tool detection error: {e}"
+                )
+
+
+        return None
+
+
+
+    # =====================================================
+    # EXECUTE MULTIPLE STEPS
     # =====================================================
 
     def execute_plan(self, plan):
 
         if not plan:
 
-            return {
+            return []
 
-                "handled": False,
 
-                "tool": None,
 
-                "result": None
-
-            }
-
-        # ---------------------------------------------
-        # SINGLE PLAN DICTIONARY
-        # ---------------------------------------------
-
-        if isinstance(plan, dict):
+        if isinstance(
+            plan,
+            dict
+        ):
 
             plan = [plan]
 
+
+
         results = []
+
 
         for step in plan:
 
-            tool_name = step.get("tool")
 
-            action = step.get("action")
+            if not isinstance(
+                step,
+                dict
+            ):
 
-            tool_input = step.get(
-                "input",
-                {}
-            )
+                continue
 
-            query = None
 
-            if isinstance(tool_input, dict):
-
-                query = tool_input.get(
-                    "query"
-                )
-
-            if not query:
-
-                query = step.get(
-                    "query"
-                )
 
             result = self.execute_by_name(
 
-                name=tool_name,
+                step.get("tool"),
 
-                action=action,
+                step.get(
+                    "action",
+                    "default"
+                ),
 
-                query=query
+                step.get(
+                    "query"
+                )
 
             )
 
-            results.append(result)
+
+            results.append(
+                result
+            )
+
+
 
         return results
+
+
 
     # =====================================================
     # LIST TOOLS
